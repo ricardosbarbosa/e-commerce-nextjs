@@ -32,7 +32,7 @@ export default function Header({
 
   return (
     <>
-      <header className="relative overflow-hidden">
+      <header className="relative">
         {/* Top navigation */}
         <nav
           aria-label="Top"
