@@ -25,14 +25,18 @@
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.6.11",
     "@elysiajs/openapi": "^1.4.15",
+    "@headlessui/react": "^2.2.10",
+    "@heroicons/react": "^2.2.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "better-auth": "^1.6.11",
+    "clsx": "^2.1.1",
     "elysia": "^1.4.28",
     "next": "16.2.6",
     "pg": "^8.20.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
