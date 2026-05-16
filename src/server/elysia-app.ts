@@ -2,11 +2,14 @@ import { openapi } from "@elysiajs/openapi";
 import { Elysia } from "elysia";
 import * as z from "zod";
 
+import { prismaPlugin } from "./plugins/prisma";
+import { authModule } from "./modules/auth";
 import { healthModule } from "./modules/health";
 import { echoBodySchema } from "./schemas/echo";
 
 // Mounted by `src/app/api/[[...slugs]]/route.ts` at `/api`.
 export const apiApp = new Elysia({ prefix: "/api" })
+  .use(prismaPlugin)
   .use(
     openapi({
       mapJsonSchema: {
@@ -41,6 +44,7 @@ export const apiApp = new Elysia({ prefix: "/api" })
       tags: ["General"],
     },
   })
+  .use(authModule)
   .use(healthModule);
 
 export type ApiApp = typeof apiApp;
