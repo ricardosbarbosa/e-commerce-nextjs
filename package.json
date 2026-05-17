@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.6.11",
+    "@better-auth/stripe": "^1.6.11",
     "@elysiajs/openapi": "^1.4.15",
     "@headlessui/react": "^2.2.10",
     "@heroicons/react": "^2.2.0",
@@ -36,6 +37,7 @@
     "pg": "^8.20.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "stripe": "^22.1.1",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3"
   },
