@@ -4,6 +4,7 @@ import * as z from "zod";
 
 import { prismaPlugin } from "./plugins/prisma";
 import { authModule } from "./modules/auth";
+import { checkoutModule } from "./modules/checkout";
 import { healthModule } from "./modules/health";
 import { echoBodySchema } from "./schemas/echo";
 
@@ -20,7 +21,10 @@ export const apiApp = new Elysia({ prefix: "/api" })
           title: "E-commerce API",
           version: "0.1.0",
         },
-        tags: [{ name: "General", description: "Rotas gerais" }],
+        tags: [
+          { name: "General", description: "Rotas gerais" },
+          { name: "Checkout", description: "Stripe checkout" },
+        ],
       },
     }),
   )
@@ -45,6 +49,7 @@ export const apiApp = new Elysia({ prefix: "/api" })
     },
   })
   .use(authModule)
+  .use(checkoutModule)
   .use(healthModule);
 
 export type ApiApp = typeof apiApp;
