@@ -20,7 +20,7 @@ export default function Page() {
       <div className="mt-6 grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:grid-rows-2 sm:gap-x-6 lg:gap-8">
         {categories?.data?.map((category) => (
           <Link
-            href={category.slug}
+            href={`/categories/${category.slug}`}
             key={category.id}
             className="group relative aspect-2/1 overflow-hidden rounded-lg sm:row-span-2 sm:aspect-square"
           >
