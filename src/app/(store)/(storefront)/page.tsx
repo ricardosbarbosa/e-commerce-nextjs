@@ -1,8 +1,10 @@
 "use client";
 
+import { api } from "@/lib/eden";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import Image from "next/image";
 import Link from "next/link";
-import { categories } from "../categories/page";
 
 const favorites = [
   {
@@ -36,6 +38,10 @@ const favorites = [
 ];
 
 export default function Example() {
+  const { data: categories } = useQuery({
+    queryKey: ["store", "categories"],
+    queryFn: () => api.store.categories.get(),
+  });
   return (
     <>
       {/* Hero section */}
@@ -152,19 +158,21 @@ export default function Example() {
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:grid-rows-2 sm:gap-x-6 lg:gap-8">
-            {categories.map((category) => (
+            {categories?.data?.map((category, index) => (
               <div
                 key={category.id}
                 className={cn(
                   "group relative aspect-2/1 overflow-hidden rounded-lg",
-                  category.id === 1
+                  index === 0
                     ? "sm:row-span-2 sm:aspect-square"
                     : "sm:aspect-auto",
                 )}
               >
-                <img
-                  alt={category.imageAlt}
-                  src={category.imageSrc}
+                <Image
+                  alt={category.imageAlt ?? category.name}
+                  src={category.imageSrc ?? category.name}
+                  width={1000}
+                  height={1000}
                   className="absolute size-full object-cover group-hover:opacity-75"
                 />
               </div>

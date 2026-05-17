@@ -6,6 +6,7 @@ import { prismaPlugin } from "./plugins/prisma";
 import { authModule } from "./modules/auth";
 import { checkoutModule } from "./modules/checkout";
 import { healthModule } from "./modules/health";
+import { storeModule } from "./modules/store";
 import { echoBodySchema } from "./schemas/echo";
 
 // Mounted by `src/app/api/[[...slugs]]/route.ts` at `/api`.
@@ -50,6 +51,7 @@ export const apiApp = new Elysia({ prefix: "/api" })
   })
   .use(authModule)
   .use(checkoutModule)
-  .use(healthModule);
+  .use(healthModule)
+  .use(storeModule);
 
 export type ApiApp = typeof apiApp;

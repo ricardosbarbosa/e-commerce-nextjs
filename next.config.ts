@@ -6,6 +6,14 @@ const nextConfig: NextConfig = {
   // Do not externalize better-auth: its React hooks must resolve to the same
   // `react` instance as the app or SSR prerender throws (e.g. useRef on null).
   serverExternalPackages: ["@prisma/client", "prisma", "pg"],
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "tailwindcss.com",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

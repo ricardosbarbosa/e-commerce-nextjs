@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@headlessui/react";
 import { CheckIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 
@@ -141,13 +142,31 @@ export default function Example() {
                       View Order
                       <span className="sr-only">{order.number}</span>
                     </Link>
-                    <a
-                      href={order.invoiceHref}
+                    <Button
+                      // href={order.invoiceHref}
+                      onClick={async () => {
+                        // const session =
+                        //   await stripeClient.checkout.sessions.retrieve(
+                        //     sessionId,
+                        //     {
+                        //       expand: ["invoice"],
+                        //     },
+                        //   );
+                        // const invoice =
+                        //   typeof session.invoice === "object" && session.invoice
+                        //     ? session.invoice
+                        //     : null;
+                        // const invoiceUrl = invoice?.hosted_invoice_url;
+                        // // open invoice url in another tab
+                        // if (invoiceUrl) {
+                        //   window.open(invoiceUrl, "_blank");
+                        // }
+                      }}
                       className="flex w-full items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-xs hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden md:w-auto"
                     >
                       View Invoice
                       <span className="sr-only">for order {order.number}</span>
-                    </a>
+                    </Button>
                   </div>
                 </div>
 
