@@ -1,90 +1,88 @@
 "use client";
+
+import { authClient } from "@/lib/auth-client";
+import { api } from "@/lib/eden";
+import { formatPrice } from "@/lib/utils";
 import { Button } from "@headlessui/react";
 import { CheckIcon } from "@heroicons/react/24/outline";
+import { useQuery } from "@tanstack/react-query";
+import Image from "next/image";
 import Link from "next/link";
 
-const orders = [
-  {
-    number: "WU88191111",
-    date: "January 22, 2021",
-    datetime: "2021-01-22",
-    href: "/orders/1",
-    invoiceHref: "#",
-    total: "$302.00",
-    products: [
-      {
-        id: 1,
-        name: "Nomad Tumbler",
-        description:
-          "This durable double-walled insulated tumbler keeps your beverages at the perfect temperature all day long. Hot, cold, or even lukewarm if you're weird like that, this bottle is ready for your next adventure.",
-        href: "#",
-        price: "$35.00",
-        status: "out-for-delivery",
-        date: "January 5, 2021",
-        datetime: "2021-01-05",
-        imageSrc:
-          "https://tailwindcss.com/plus-assets/img/ecommerce-images/order-history-page-06-product-01.jpg",
-        imageAlt:
-          "Olive drab green insulated bottle with flared screw lid and flat top.",
-      },
-      {
-        id: 2,
-        name: "Leather Long Wallet",
-        description:
-          "We're not sure who carries cash anymore, but this leather long wallet will keep those bills nice and fold-free. The cashier hasn't seen print money in years, but you'll make a damn fine impression with your pristine cash monies.",
-        href: "#",
-        price: "$118.00",
-        status: "delivered",
-        date: "January 25, 2021",
-        datetime: "2021-01-25",
-        imageSrc:
-          "https://tailwindcss.com/plus-assets/img/ecommerce-images/order-history-page-06-product-02.jpg",
-        imageAlt:
-          "Leather long wallet held open with hand-stitched card dividers, full-length bill pocket, and simple tab closure.",
-      },
-      {
-        id: 3,
-        name: "Minimalist Wristwatch",
-        description:
-          "This contemporary wristwatch has a clean, minimalist look and high quality components. Everyone knows you'll never use it to check the time, but wow, does that wrist look good with this timepiece on it.",
-        href: "#",
-        price: "$149.00",
-        status: "delivered",
-        date: "January 25, 2021",
-        datetime: "2021-01-25",
-        imageSrc:
-          "https://tailwindcss.com/plus-assets/img/ecommerce-images/order-history-page-06-product-03.jpg",
-        imageAlt:
-          "Wristwatch with black leather band, brass ring-3, white watch face, thin watch hands, and fine time markings.",
-      },
-    ],
-  },
-  {
-    number: "WU88191009",
-    date: "January 5, 2021",
-    datetime: "2021-01-05",
-    href: "/orders/2",
-    invoiceHref: "#",
-    total: "$27.00",
-    products: [
-      {
-        id: 1,
-        name: "Mini Sketchbook Set",
-        description:
-          "These pocket-sized sketchbooks feature recycled paper covers and screen printed designs from our top-selling poster collection. You have ideas, doodles, and notes, but nowhere to write them down. We have paper, wrapped in sturdier paper.",
-        href: "#",
-        price: "$27.00",
-        status: "cancelled",
-        date: "January 7, 2021",
-        datetime: "2021-01-07",
-        imageSrc:
-          "https://tailwindcss.com/plus-assets/img/ecommerce-images/order-history-page-06-product-04.jpg",
-        imageAlt: "Set of three light and dark brown mini sketch books.",
-      },
-    ],
-  },
-];
-export default function Example() {
+type OrdersResponse = NonNullable<
+  Awaited<ReturnType<typeof api.orders.get>>["data"]
+>;
+type Order = OrdersResponse["orders"][number];
+type OrderItem = Order["items"][number];
+
+function errorMessage(error: unknown, fallback: string) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "value" in error &&
+    typeof error.value === "object" &&
+    error.value !== null &&
+    "error" in error.value &&
+    typeof error.value.error === "string"
+  ) {
+    return error.value.error;
+  }
+
+  return fallback;
+}
+
+function formatOrderDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+function fulfillmentLabel(status: OrderItem["fulfillmentStatus"]) {
+  switch (status) {
+    case "PROCESSING":
+      return "Processing";
+    case "SHIPPED":
+      return "Shipped";
+    case "OUT_FOR_DELIVERY":
+      return "Out for delivery";
+    case "DELIVERED":
+      return "Delivered";
+    case "CANCELLED":
+      return "Cancelled";
+    case "NOT_FULFILLED":
+    default:
+      return "Preparing";
+  }
+}
+
+export default function OrdersPage() {
+  const { data: session, isPending: isSessionPending } =
+    authClient.useSession();
+  const {
+    data,
+    isLoading: isOrdersLoading,
+    isError: isOrdersError,
+  } = useQuery({
+    queryKey: ["orders"],
+    queryFn: async () => {
+      const response = await api.orders.get();
+
+      if (response.error) {
+        throw new Error(
+          errorMessage(response.error, "Could not load your orders."),
+        );
+      }
+
+      return response.data;
+    },
+    enabled: Boolean(session),
+  });
+
+  const orders = data?.orders ?? [];
+  const isLoading = isSessionPending || isOrdersLoading;
+
   return (
     <>
       <div className="mx-auto max-w-4xl">
@@ -98,6 +96,50 @@ export default function Example() {
           </p>
         </div>
 
+        {!isLoading && !session ? (
+          <div
+            role="alert"
+            className="mt-8 rounded-md border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800"
+          >
+            Sign in to view your order history.{" "}
+            <Link href="/sign-in" className="font-medium underline">
+              Go to sign in
+            </Link>
+            .
+          </div>
+        ) : null}
+
+        {isLoading ? (
+          <div
+            role="status"
+            className="mt-8 rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-600"
+          >
+            Loading your orders...
+          </div>
+        ) : null}
+
+        {!isLoading && session && isOrdersError ? (
+          <div
+            role="alert"
+            className="mt-8 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          >
+            Could not load your order history. Please refresh and try again.
+          </div>
+        ) : null}
+
+        {!isLoading && session && !isOrdersError && orders.length === 0 ? (
+          <div
+            role="status"
+            className="mt-8 rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-600"
+          >
+            You do not have any orders yet.{" "}
+            <Link href="/products" className="font-medium text-indigo-600">
+              Continue shopping
+            </Link>
+            .
+          </div>
+        ) : null}
+
         <section aria-labelledby="recent-heading" className="mt-16">
           <h2 id="recent-heading" className="sr-only">
             Recent orders
@@ -108,7 +150,9 @@ export default function Example() {
               <div key={order.number}>
                 <h3 className="sr-only">
                   Order placed on{" "}
-                  <time dateTime={order.datetime}>{order.date}</time>
+                  <time dateTime={order.placedAt}>
+                    {formatOrderDate(order.placedAt)}
+                  </time>
                 </h3>
 
                 <div className="bg-gray-50 px-4 py-6 sm:rounded-lg sm:p-6 md:flex md:items-center md:justify-between md:space-x-6 lg:space-x-8">
@@ -122,7 +166,9 @@ export default function Example() {
                     <div className="max-md:flex max-md:justify-between max-md:py-4 max-md:first:pt-0 max-md:last:pb-0">
                       <dt className="font-medium text-gray-900">Date placed</dt>
                       <dd className="md:mt-1">
-                        <time dateTime={order.datetime}>{order.date}</time>
+                        <time dateTime={order.placedAt}>
+                          {formatOrderDate(order.placedAt)}
+                        </time>
                       </dd>
                     </div>
                     <div className="max-md:flex max-md:justify-between max-md:py-4 max-md:first:pt-0 max-md:last:pb-0">
@@ -130,7 +176,7 @@ export default function Example() {
                         Total amount
                       </dt>
                       <dd className="font-medium text-gray-900 md:mt-1">
-                        {order.total}
+                        {formatPrice(order.totalAmount, order.currency)}
                       </dd>
                     </div>
                   </dl>
@@ -142,60 +188,67 @@ export default function Example() {
                       View Order
                       <span className="sr-only">{order.number}</span>
                     </Link>
-                    <Button
-                      // href={order.invoiceHref}
-                      onClick={async () => {
-                        // const session =
-                        //   await stripeClient.checkout.sessions.retrieve(
-                        //     sessionId,
-                        //     {
-                        //       expand: ["invoice"],
-                        //     },
-                        //   );
-                        // const invoice =
-                        //   typeof session.invoice === "object" && session.invoice
-                        //     ? session.invoice
-                        //     : null;
-                        // const invoiceUrl = invoice?.hosted_invoice_url;
-                        // // open invoice url in another tab
-                        // if (invoiceUrl) {
-                        //   window.open(invoiceUrl, "_blank");
-                        // }
-                      }}
-                      className="flex w-full items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-xs hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden md:w-auto"
-                    >
-                      View Invoice
-                      <span className="sr-only">for order {order.number}</span>
-                    </Button>
+                    {order.invoiceUrl ? (
+                      <Link
+                        href={order.invoiceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex w-full items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-xs hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden md:w-auto"
+                      >
+                        View Invoice
+                        <span className="sr-only">
+                          for order {order.number}
+                        </span>
+                      </Link>
+                    ) : (
+                      <Button
+                        disabled
+                        className="flex w-full cursor-not-allowed items-center justify-center rounded-md border border-gray-200 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-400 md:w-auto"
+                      >
+                        Invoice unavailable
+                        <span className="sr-only">
+                          for order {order.number}
+                        </span>
+                      </Button>
+                    )}
                   </div>
                 </div>
 
                 <div className="mt-6 flow-root px-4 sm:mt-10 sm:px-0">
                   <div className="-my-6 divide-y divide-gray-200 sm:-my-10">
-                    {order.products.map((product) => (
-                      <div key={product.id} className="flex py-6 sm:py-10">
+                    {order.items.map((item) => (
+                      <div key={item.id} className="flex py-6 sm:py-10">
                         <div className="min-w-0 flex-1 lg:flex lg:flex-col">
                           <div className="lg:flex-1">
                             <div className="sm:flex">
                               <div>
                                 <h4 className="font-medium text-gray-900">
-                                  {product.name}
+                                  {item.productName}
                                 </h4>
-                                <p className="mt-2 hidden text-sm text-gray-500 sm:block">
-                                  {product.description}
-                                </p>
+                                {item.variantName ? (
+                                  <p className="mt-1 text-sm text-gray-500">
+                                    {item.variantName}
+                                  </p>
+                                ) : null}
+                                {item.description ? (
+                                  <p className="mt-2 hidden text-sm text-gray-500 sm:block">
+                                    {item.description}
+                                  </p>
+                                ) : null}
                               </div>
                               <p className="mt-1 font-medium text-gray-900 sm:mt-0 sm:ml-6">
-                                {product.price}
+                                {formatPrice(item.unitPrice, order.currency)}
                               </p>
                             </div>
                             <div className="mt-2 flex text-sm font-medium sm:mt-4">
-                              <a
-                                href={product.href}
-                                className="text-indigo-600 hover:text-indigo-500"
-                              >
-                                View Product
-                              </a>
+                              {item.href ? (
+                                <Link
+                                  href={item.href}
+                                  className="text-indigo-600 hover:text-indigo-500"
+                                >
+                                  View Product
+                                </Link>
+                              ) : null}
                               <div className="ml-4 border-l border-gray-200 pl-4 sm:ml-6 sm:pl-6">
                                 <a
                                   href="#"
@@ -207,7 +260,7 @@ export default function Example() {
                             </div>
                           </div>
                           <div className="mt-6 font-medium">
-                            {product.status === "delivered" ? (
+                            {item.fulfillmentStatus === "DELIVERED" ? (
                               <div className="flex space-x-2">
                                 <CheckIcon
                                   aria-hidden="true"
@@ -217,26 +270,32 @@ export default function Example() {
                                   Delivered
                                   <span className="hidden sm:inline">
                                     {" "}
-                                    on{" "}
-                                    <time dateTime={product.datetime}>
-                                      {product.date}
+                                    for order placed on{" "}
+                                    <time dateTime={order.placedAt}>
+                                      {formatOrderDate(order.placedAt)}
                                     </time>
                                   </span>
                                 </p>
                               </div>
-                            ) : product.status === "out-for-delivery" ? (
-                              <p>Out for delivery</p>
-                            ) : product.status === "cancelled" ? (
+                            ) : item.fulfillmentStatus === "CANCELLED" ? (
                               <p className="text-gray-500">Cancelled</p>
-                            ) : null}
+                            ) : (
+                              <p>{fulfillmentLabel(item.fulfillmentStatus)}</p>
+                            )}
                           </div>
                         </div>
                         <div className="ml-4 shrink-0 sm:order-first sm:m-0 sm:mr-6">
-                          <img
-                            alt={product.imageAlt}
-                            src={product.imageSrc}
-                            className="col-start-2 col-end-3 size-20 rounded-lg object-cover sm:col-start-1 sm:row-span-2 sm:row-start-1 sm:size-40 lg:size-52"
-                          />
+                          {item.imageSrc ? (
+                            <Image
+                              alt={item.imageAlt ?? ""}
+                              src={item.imageSrc}
+                              width={208}
+                              height={208}
+                              className="col-start-2 col-end-3 size-20 rounded-lg object-cover sm:col-start-1 sm:row-span-2 sm:row-start-1 sm:size-40 lg:size-52"
+                            />
+                          ) : (
+                            <div className="col-start-2 col-end-3 size-20 rounded-lg bg-gray-200 sm:col-start-1 sm:row-span-2 sm:row-start-1 sm:size-40 lg:size-52" />
+                          )}
                         </div>
                       </div>
                     ))}
