@@ -15,6 +15,9 @@ import { navigation } from "./navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/eden";
+import Image from "next/image";
 
 export default function Header({
   setOpen,
@@ -23,12 +26,18 @@ export default function Header({
 }) {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
+  const { data: cartSummary } = useQuery({
+    queryKey: ["cart", "summary"],
+    queryFn: () => api.cart.get(),
+    enabled: Boolean(session),
+  });
 
   if (isPending) {
     return <div>Loading...</div>;
   }
 
   const displayName = session?.user?.name?.trim() || session?.user?.email;
+  const cartItemCount = cartSummary?.data?.totalQuantity ?? 0;
 
   return (
     <>
@@ -54,9 +63,11 @@ export default function Header({
               <div className="ml-4 flex lg:ml-0">
                 <Link href="/">
                   <span className="sr-only">Your Company</span>
-                  <img
+                  <Image
                     alt=""
                     src="https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=indigo&shade=600"
+                    width={32}
+                    height={32}
                     className="h-8 w-auto"
                   />
                 </Link>
@@ -94,9 +105,11 @@ export default function Header({
                                     key={item.name}
                                     className="group relative text-base sm:text-sm"
                                   >
-                                    <img
+                                    <Image
                                       alt={item.imageAlt}
                                       src={item.imageSrc}
+                                      width={500}
+                                      height={500}
                                       className="aspect-square w-full rounded-lg bg-gray-100 object-cover group-hover:opacity-75"
                                     />
                                     <a
@@ -229,7 +242,7 @@ export default function Header({
                       className="size-6 shrink-0 text-gray-400 group-hover:text-gray-500"
                     />
                     <span className="ml-2 text-sm font-medium text-gray-700 group-hover:text-gray-800">
-                      0
+                      {cartItemCount}
                     </span>
                     <span className="sr-only">items in cart, view bag</span>
                   </Link>
