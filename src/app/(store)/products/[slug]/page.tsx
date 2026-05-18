@@ -6,10 +6,10 @@ import {
 } from "@heroicons/react/24/outline";
 import { StarIcon } from "@heroicons/react/20/solid";
 import { cn, formatPrice } from "@/lib/utils";
-import { useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useParams, useRouter } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/eden";
-import { useState } from "react";
+import { type FormEvent, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -174,11 +174,45 @@ const policies = [
 
 export default function Example() {
   const { slug } = useParams<{ slug: string }>();
+  const router = useRouter();
+  const queryClient = useQueryClient();
 
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [cartError, setCartError] = useState<string | null>(null);
+  const [cartMessage, setCartMessage] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [limit] = useState(2);
+
+  const addToCart = useMutation({
+    mutationFn: async ({
+      productId,
+      variantId,
+    }: {
+      productId: string;
+      variantId: string;
+    }) => {
+      const response = await api.cart.items.post({
+        productId,
+        variantId,
+        quantity: 1,
+      });
+
+      if (response.error) {
+        const message =
+          typeof response.error.value === "object" &&
+          response.error.value &&
+          "error" in response.error.value &&
+          typeof response.error.value.error === "string"
+            ? response.error.value.error
+            : "Could not add this product to your cart.";
+
+        throw new Error(message);
+      }
+
+      return response.data;
+    },
+  });
 
   const { data: product } = useQuery({
     queryKey: ["products", slug],
@@ -210,10 +244,63 @@ export default function Example() {
     return <div>Product not found</div>;
   }
 
-  const selectedVariant = product.data.variants.find(
-    (variant) =>
-      variant.color?.id === selectedColor && variant.size?.id === selectedSize,
-  );
+  const productData = product.data;
+  const hasColorOptions = productData.variants.some((variant) => variant.color);
+  const hasSizeOptions = productData.variants.some((variant) => variant.size);
+
+  const selectedVariant = productData.variants.find((variant) => {
+    const colorMatches =
+      !hasColorOptions || variant.color?.id === selectedColor;
+    const sizeMatches = !hasSizeOptions || variant.size?.id === selectedSize;
+
+    return colorMatches && sizeMatches;
+  });
+
+  const hasSelectedRequiredOptions =
+    (!hasColorOptions || Boolean(selectedColor)) &&
+    (!hasSizeOptions || Boolean(selectedSize));
+
+  const canAddToCart =
+    Boolean(selectedVariant) &&
+    hasSelectedRequiredOptions &&
+    (selectedVariant?.inventoryQuantity ?? 0) > 0;
+
+  async function handleAddToCart(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCartError(null);
+    setCartMessage(null);
+
+    if (!selectedVariant) {
+      setCartError("Choose the available options before adding this item.");
+      return;
+    }
+
+    if (selectedVariant.inventoryQuantity <= 0) {
+      setCartError("This variant is currently out of stock.");
+      return;
+    }
+
+    try {
+      await addToCart.mutateAsync({
+        productId: productData.id,
+        variantId: selectedVariant.id,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["cart", "summary"] });
+      setCartMessage("Added to cart.");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Could not add this product to your cart.";
+
+      if (message === "Unauthorized") {
+        router.push(`/sign-in`);
+        return;
+      }
+
+      setCartError(message);
+    }
+  }
 
   const availableColorIds = new Set(
     product.data.variants.flatMap((variant) => {
@@ -248,40 +335,43 @@ export default function Example() {
             </p>
           </div>
           {/* Reviews */}
-          <div className="mt-4">
-            <h2 className="sr-only">Reviews</h2>
-            <div className="flex items-center">
-              <p className="text-sm text-gray-700">
-                {reviews?.data?.averageRating ?? 0}
-                <span className="sr-only"> out of 5 stars</span>
-              </p>
-              <div className="ml-1 flex items-center">
-                {[0, 1, 2, 3, 4].map((rating) => (
-                  <StarIcon
-                    key={rating}
-                    aria-hidden="true"
-                    className={cn(
-                      (reviews?.data?.averageRating ?? 0) > rating
-                        ? "text-yellow-400"
-                        : "text-gray-200",
-                      "size-5 shrink-0",
-                    )}
-                  />
-                ))}
-              </div>
-              <div aria-hidden="true" className="ml-4 text-sm text-gray-300">
-                ·
-              </div>
-              <div className="ml-4 flex">
-                <a
-                  href="#"
-                  className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
-                >
-                  See all {reviews?.data?.totalCount ?? 0} reviews
-                </a>
+          {(reviews?.data?.totalCount ?? 0) > 0 ? (
+            <div className="mt-4">
+              <h2 className="sr-only">Reviews</h2>
+              <div className="flex items-center">
+                <p className="text-sm text-gray-700">
+                  {reviews?.data?.averageRating ?? 0}
+                  <span className="sr-only"> out of 5 stars</span>
+                </p>
+
+                <div className="ml-1 flex items-center">
+                  {[0, 1, 2, 3, 4].map((rating) => (
+                    <StarIcon
+                      key={rating}
+                      aria-hidden="true"
+                      className={cn(
+                        (reviews?.data?.averageRating ?? 0) > rating
+                          ? "text-yellow-400"
+                          : "text-gray-200",
+                        "size-5 shrink-0",
+                      )}
+                    />
+                  ))}
+                </div>
+                <div aria-hidden="true" className="ml-4 text-sm text-gray-300">
+                  ·
+                </div>
+                <div className="ml-4 flex">
+                  <a
+                    href="#"
+                    className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+                  >
+                    See all {reviews?.data?.totalCount ?? 0} reviews
+                  </a>
+                </div>
               </div>
             </div>
-          </div>
+          ) : null}
         </div>
 
         {/* Image gallery */}
@@ -290,10 +380,12 @@ export default function Example() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 lg:grid-rows-3 lg:gap-8">
             {product.data.images.map((image) => (
-              <img
+              <Image
                 key={image.id}
                 alt={image.imageAlt ?? product.data?.name ?? ""}
                 src={image.imageSrc}
+                width={1000}
+                height={1000}
                 className={cn(
                   image.isPrimary
                     ? "lg:col-span-2 lg:row-span-2"
@@ -306,7 +398,7 @@ export default function Example() {
         </div>
 
         <div className="mt-8 lg:col-span-5">
-          <form>
+          <form onSubmit={handleAddToCart}>
             {/* Color picker */}
             <div>
               <h2 className="text-sm font-medium text-gray-900">Color</h2>
@@ -396,10 +488,29 @@ export default function Example() {
 
             <button
               type="submit"
-              className="mt-8 flex w-full items-center justify-center rounded-md border border-transparent bg-indigo-600 px-8 py-3 text-base font-medium text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden"
+              disabled={!canAddToCart || addToCart.isPending}
+              className="mt-8 flex w-full items-center justify-center rounded-md border border-transparent bg-indigo-600 px-8 py-3 text-base font-medium text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
             >
-              Add to cart
+              {addToCart.isPending ? "Adding..." : "Add to cart"}
             </button>
+
+            {cartError ? (
+              <p className="mt-3 text-sm text-red-600" role="alert">
+                {cartError}
+              </p>
+            ) : null}
+
+            {cartMessage ? (
+              <p className="mt-3 text-sm text-green-700" role="status">
+                {cartMessage}{" "}
+                <Link
+                  href="/cart"
+                  className="font-medium text-indigo-600 hover:text-indigo-500"
+                >
+                  View cart
+                </Link>
+              </p>
+            ) : null}
           </form>
 
           {/* Product details */}
@@ -465,129 +576,145 @@ export default function Example() {
       </div>
 
       {/* Reviews */}
-      <section aria-labelledby="reviews-heading" className="mt-16 sm:mt-24">
-        <h2 id="reviews-heading" className="text-lg font-medium text-gray-900">
-          Recent reviews
-        </h2>
+      {(reviews?.data?.totalCount ?? 0) > 0 ? (
+        <section aria-labelledby="reviews-heading" className="mt-16 sm:mt-24">
+          <h2
+            id="reviews-heading"
+            className="text-lg font-medium text-gray-900"
+          >
+            Recent reviews
+          </h2>
 
-        <div className="mt-6 divide-y divide-gray-200 border-t border-b border-gray-200">
-          {reviews?.data?.reviews?.map((review) => (
-            <div
-              key={review.id}
-              className="py-10 lg:grid lg:grid-cols-12 lg:gap-x-8"
-            >
-              <div className="lg:col-span-8 lg:col-start-5 xl:col-span-9 xl:col-start-4 xl:grid xl:grid-cols-3 xl:items-start xl:gap-x-8">
-                <div className="flex items-center xl:col-span-1">
-                  <div className="flex items-center">
-                    {[0, 1, 2, 3, 4].map((rating) => (
-                      <StarIcon
-                        key={rating}
-                        aria-hidden="true"
-                        className={cn(
-                          review.rating > rating
-                            ? "text-yellow-400"
-                            : "text-gray-200",
-                          "size-5 shrink-0",
-                        )}
-                      />
-                    ))}
+          <div className="mt-6 divide-y divide-gray-200 border-t border-b border-gray-200">
+            {reviews?.data?.reviews?.map((review) => (
+              <div
+                key={review.id}
+                className="py-10 lg:grid lg:grid-cols-12 lg:gap-x-8"
+              >
+                <div className="lg:col-span-8 lg:col-start-5 xl:col-span-9 xl:col-start-4 xl:grid xl:grid-cols-3 xl:items-start xl:gap-x-8">
+                  <div className="flex items-center xl:col-span-1">
+                    <div className="flex items-center">
+                      {[0, 1, 2, 3, 4].map((rating) => (
+                        <StarIcon
+                          key={rating}
+                          aria-hidden="true"
+                          className={cn(
+                            review.rating > rating
+                              ? "text-yellow-400"
+                              : "text-gray-200",
+                            "size-5 shrink-0",
+                          )}
+                        />
+                      ))}
+                    </div>
+                    <p className="ml-3 text-sm text-gray-700">
+                      {review.rating}
+                      <span className="sr-only"> out of 5 stars</span>
+                    </p>
                   </div>
-                  <p className="ml-3 text-sm text-gray-700">
-                    {review.rating}
-                    <span className="sr-only"> out of 5 stars</span>
+
+                  <div className="mt-4 lg:mt-6 xl:col-span-2 xl:mt-0">
+                    <h3 className="text-sm font-medium text-gray-900">
+                      {review.title}
+                    </h3>
+
+                    <div
+                      dangerouslySetInnerHTML={{ __html: review.content }}
+                      className="mt-3 space-y-6 text-sm text-gray-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-6 flex items-center text-sm lg:col-span-4 lg:col-start-1 lg:row-start-1 lg:mt-0 lg:flex-col lg:items-start xl:col-span-3">
+                  <p className="font-medium text-gray-900">
+                    {review.authorName}
                   </p>
-                </div>
-
-                <div className="mt-4 lg:mt-6 xl:col-span-2 xl:mt-0">
-                  <h3 className="text-sm font-medium text-gray-900">
-                    {review.title}
-                  </h3>
-
-                  <div
-                    dangerouslySetInnerHTML={{ __html: review.content }}
-                    className="mt-3 space-y-6 text-sm text-gray-500"
-                  />
+                  <time
+                    dateTime={review.publishedAt?.toISOString()}
+                    className="ml-4 border-l border-gray-200 pl-4 text-gray-500 lg:mt-2 lg:ml-0 lg:border-0 lg:pl-0"
+                  >
+                    {review.publishedAt?.toLocaleDateString() ?? ""}
+                  </time>
                 </div>
               </div>
-
-              <div className="mt-6 flex items-center text-sm lg:col-span-4 lg:col-start-1 lg:row-start-1 lg:mt-0 lg:flex-col lg:items-start xl:col-span-3">
-                <p className="font-medium text-gray-900">{review.authorName}</p>
-                <time
-                  dateTime={review.publishedAt?.toISOString()}
-                  className="ml-4 border-l border-gray-200 pl-4 text-gray-500 lg:mt-2 lg:ml-0 lg:border-0 lg:pl-0"
-                >
-                  {review.publishedAt?.toLocaleDateString() ?? ""}
-                </time>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Pagination: 1 of x reviews */}
-        <div className="mt-6">
-          <div className="flex items-center gap-x-2">
-            <button
-              onClick={() => setPage(page - 1)}
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-gray-500">
-              {page} of {Math.ceil((reviews?.data?.totalCount ?? 0) / limit)}
-            </span>
-            <button
-              onClick={() => setPage(page + 1)}
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
-            >
-              Next
-            </button>
+            ))}
           </div>
-        </div>
-      </section>
+
+          {/* Pagination: 1 of x reviews */}
+          <div className="mt-6">
+            <div className="flex items-center gap-x-2">
+              <button
+                onClick={() => setPage(page - 1)}
+                className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-gray-500">
+                {page} of {Math.ceil((reviews?.data?.totalCount ?? 0) / limit)}
+              </span>
+              <button
+                onClick={() => setPage(page + 1)}
+                className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {/* Related products */}
-      <section aria-labelledby="related-heading" className="mt-16 sm:mt-24">
-        <h2 id="related-heading" className="text-lg font-medium text-gray-900">
-          Customers also purchased
-        </h2>
+      {(product.data.recommendations.length ?? 0) > 0 ? (
+        <section aria-labelledby="related-heading" className="mt-16 sm:mt-24">
+          <h2
+            id="related-heading"
+            className="text-lg font-medium text-gray-900"
+          >
+            Customers also purchased
+          </h2>
 
-        <div className="mt-6 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8">
-          {product.data.recommendations.map((relatedProduct) => (
-            <div
-              key={relatedProduct.recommendedProductId}
-              className="group relative"
-            >
-              <Image
-                alt={relatedProduct.recommendedProduct.images[0].imageAlt ?? ""}
-                src={relatedProduct.recommendedProduct.images[0].imageSrc ?? ""}
-                width={1000}
-                height={1000}
-                className="aspect-square w-full rounded-md object-cover group-hover:opacity-75 lg:aspect-auto lg:h-80"
-              />
-              <div className="mt-4 flex justify-between">
-                <div>
-                  <h3 className="text-sm text-gray-700">
-                    <Link href={relatedProduct.recommendedProduct.slug}>
-                      <span aria-hidden="true" className="absolute inset-0" />
-                      {relatedProduct.recommendedProduct.name}
-                    </Link>
-                  </h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {relatedProduct.recommendedProduct.variants?.[0]?.color
-                      ?.name ?? ""}
+          <div className="mt-6 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8">
+            {product.data.recommendations.map((relatedProduct) => (
+              <div
+                key={relatedProduct.recommendedProductId}
+                className="group relative"
+              >
+                <Image
+                  alt={
+                    relatedProduct.recommendedProduct.images[0].imageAlt ?? ""
+                  }
+                  src={
+                    relatedProduct.recommendedProduct.images[0].imageSrc ?? ""
+                  }
+                  width={1000}
+                  height={1000}
+                  className="aspect-square w-full rounded-md object-cover group-hover:opacity-75 lg:aspect-auto lg:h-80"
+                />
+                <div className="mt-4 flex justify-between">
+                  <div>
+                    <h3 className="text-sm text-gray-700">
+                      <Link href={relatedProduct.recommendedProduct.slug}>
+                        <span aria-hidden="true" className="absolute inset-0" />
+                        {relatedProduct.recommendedProduct.name}
+                      </Link>
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {relatedProduct.recommendedProduct.variants?.[0]?.color
+                        ?.name ?? ""}
+                    </p>
+                  </div>
+                  <p className="text-sm font-medium text-gray-900">
+                    {formatPrice(
+                      Number(relatedProduct.recommendedProduct.price ?? 0),
+                      relatedProduct.recommendedProduct.currency,
+                    )}
                   </p>
                 </div>
-                <p className="text-sm font-medium text-gray-900">
-                  {formatPrice(
-                    Number(relatedProduct.recommendedProduct.price ?? 0),
-                    relatedProduct.recommendedProduct.currency,
-                  )}
-                </p>
               </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </>
   );
 }
