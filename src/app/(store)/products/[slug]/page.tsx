@@ -178,7 +178,7 @@ export default function Example() {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(2);
+  const [limit] = useState(2);
 
   const { data: product } = useQuery({
     queryKey: ["products", slug],
@@ -215,11 +215,28 @@ export default function Example() {
       variant.color?.id === selectedColor && variant.size?.id === selectedSize,
   );
 
+  const availableColorIds = new Set(
+    product.data.variants.flatMap((variant) => {
+      if (selectedSize && variant.size?.id !== selectedSize) {
+        return [];
+      }
+
+      return variant.color?.id ? [variant.color.id] : [];
+    }),
+  );
+
+  const availableSizeIds = new Set(
+    product.data.variants.flatMap((variant) => {
+      if (selectedColor && variant.color?.id !== selectedColor) {
+        return [];
+      }
+
+      return variant.size?.id ? [variant.size.id] : [];
+    }),
+  );
+
   return (
     <>
-      <pre className="text-xs text-gray-500">
-        {JSON.stringify(selectedVariant, null, 2)}
-      </pre>
       <div className="lg:grid lg:auto-rows-min lg:grid-cols-12 lg:gap-x-8">
         <div className="lg:col-span-5 lg:col-start-8">
           <div className="flex justify-between">
@@ -296,26 +313,36 @@ export default function Example() {
 
               <fieldset aria-label="Choose a color" className="mt-2">
                 <div className="flex items-center gap-x-3">
-                  {colors?.data?.map((color) => (
-                    <div
-                      key={color.id}
-                      className="flex rounded-full outline -outline-offset-1 outline-black/10"
-                    >
-                      <input
-                        value={color.id}
-                        checked={selectedColor === color.id}
-                        onChange={(e) => setSelectedColor(e.target.value)}
-                        name="color"
-                        type="radio"
-                        aria-label={color.name}
-                        style={{ backgroundColor: color.hex ?? undefined }}
-                        className={cn(
-                          color.className,
-                          "size-8 appearance-none rounded-full forced-color-adjust-none checked:outline-2 checked:outline-offset-2 focus-visible:outline-3 focus-visible:outline-offset-3",
-                        )}
-                      />
-                    </div>
-                  ))}
+                  {colors?.data?.map((color) => {
+                    const isAvailable = availableColorIds.has(color.id);
+
+                    return (
+                      <div
+                        key={color.id}
+                        className="flex rounded-full outline -outline-offset-1 outline-black/10"
+                      >
+                        <input
+                          value={color.id}
+                          checked={selectedColor === color.id}
+                          disabled={!isAvailable}
+                          onClick={() => {
+                            if (selectedColor === color.id) {
+                              setSelectedColor(null);
+                            }
+                          }}
+                          onChange={(e) => setSelectedColor(e.target.value)}
+                          name="color"
+                          type="radio"
+                          aria-label={color.name}
+                          style={{ backgroundColor: color.hex ?? undefined }}
+                          className={cn(
+                            color.className,
+                            "size-8 appearance-none rounded-full forced-color-adjust-none checked:outline-2 checked:outline-offset-2 focus-visible:outline-3 focus-visible:outline-offset-3 disabled:cursor-not-allowed disabled:opacity-25",
+                          )}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </fieldset>
             </div>
@@ -334,25 +361,35 @@ export default function Example() {
 
               <fieldset aria-label="Choose a size" className="mt-2">
                 <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-                  {sizes?.data?.map((size) => (
-                    <label
-                      key={size.id}
-                      aria-label={size.name}
-                      className="group relative flex items-center justify-center rounded-md border border-gray-300 bg-white p-3 has-checked:border-indigo-600 has-checked:bg-indigo-600 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-indigo-600 has-disabled:border-gray-400 has-disabled:bg-gray-200 has-disabled:opacity-25"
-                    >
-                      <input
-                        value={size.id}
-                        checked={selectedSize === size.id}
-                        onChange={(e) => setSelectedSize(e.target.value)}
-                        name="size"
-                        type="radio"
-                        className="absolute inset-0 appearance-none focus:outline-none disabled:cursor-not-allowed"
-                      />
-                      <span className="text-sm font-medium text-gray-900 uppercase group-has-checked:text-white">
-                        {size.name}
-                      </span>
-                    </label>
-                  ))}
+                  {sizes?.data?.map((size) => {
+                    const isAvailable = availableSizeIds.has(size.id);
+
+                    return (
+                      <label
+                        key={size.id}
+                        aria-label={size.name}
+                        className="group relative flex items-center justify-center rounded-md border border-gray-300 bg-white p-3 has-checked:border-indigo-600 has-checked:bg-indigo-600 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-indigo-600 has-disabled:border-gray-400 has-disabled:bg-gray-200 has-disabled:opacity-25"
+                      >
+                        <input
+                          value={size.id}
+                          checked={selectedSize === size.id}
+                          disabled={!isAvailable}
+                          onClick={() => {
+                            if (selectedSize === size.id) {
+                              setSelectedSize(null);
+                            }
+                          }}
+                          onChange={(e) => setSelectedSize(e.target.value)}
+                          name="size"
+                          type="radio"
+                          className="absolute inset-0 appearance-none focus:outline-none disabled:cursor-not-allowed"
+                        />
+                        <span className="text-sm font-medium text-gray-900 uppercase group-has-checked:text-white">
+                          {size.name}
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
               </fieldset>
             </div>
