@@ -40,7 +40,7 @@ const favorites = [
 export default function Example() {
   const { data: categories } = useQuery({
     queryKey: ["store", "categories"],
-    queryFn: () => api.store.categories.get(),
+    queryFn: () => api.categories.get(),
   });
   return (
     <>
@@ -159,7 +159,8 @@ export default function Example() {
 
           <div className="mt-6 grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:grid-rows-2 sm:gap-x-6 lg:gap-8">
             {categories?.data?.map((category, index) => (
-              <div
+              <Link
+                href={`/categories/${category.slug}`}
                 key={category.id}
                 className={cn(
                   "group relative aspect-2/1 overflow-hidden rounded-lg",
@@ -175,7 +176,7 @@ export default function Example() {
                   height={1000}
                   className="absolute size-full object-cover group-hover:opacity-75"
                 />
-              </div>
+              </Link>
             ))}
           </div>
 
