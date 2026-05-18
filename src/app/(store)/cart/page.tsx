@@ -1,51 +1,59 @@
 "use client";
-import { ChevronDownIcon } from "@heroicons/react/16/solid";
+import { authClient } from "@/lib/auth-client";
+import { api } from "@/lib/eden";
+import { formatPrice } from "@/lib/utils";
 import {
   CheckIcon,
   ClockIcon,
+  MinusIcon,
+  PlusIcon,
   QuestionMarkCircleIcon,
   XMarkIcon as XMarkIconMini,
 } from "@heroicons/react/20/solid";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-const products = [
-  {
-    id: 1,
-    name: "Basic Tee",
-    href: "#",
-    price: "$32.00",
-    color: "Sienna",
-    inStock: true,
-    size: "Large",
-    imageSrc:
-      "https://tailwindcss.com/plus-assets/img/ecommerce-images/shopping-cart-page-01-product-01.jpg",
-    imageAlt: "Front of men's Basic Tee in sienna.",
-  },
-  {
-    id: 2,
-    name: "Basic Tee",
-    href: "#",
-    price: "$32.00",
-    color: "Black",
-    inStock: false,
-    leadTime: "3–4 weeks",
-    size: "Large",
-    imageSrc:
-      "https://tailwindcss.com/plus-assets/img/ecommerce-images/shopping-cart-page-01-product-02.jpg",
-    imageAlt: "Front of men's Basic Tee in black.",
-  },
-  {
-    id: 3,
-    name: "Nomad Tumbler",
-    href: "#",
-    price: "$35.00",
-    color: "White",
-    inStock: true,
-    imageSrc:
-      "https://tailwindcss.com/plus-assets/img/ecommerce-images/shopping-cart-page-01-product-03.jpg",
-    imageAlt: "Insulated bottle with white base and black snap lid.",
-  },
-];
+// const products = [
+//   {
+//     id: 1,
+//     name: "Basic Tee",
+//     href: "#",
+//     price: "$32.00",
+//     color: "Sienna",
+//     inStock: true,
+//     size: "Large",
+//     imageSrc:
+//       "https://tailwindcss.com/plus-assets/img/ecommerce-images/shopping-cart-page-01-product-01.jpg",
+//     imageAlt: "Front of men's Basic Tee in sienna.",
+//   },
+//   {
+//     id: 2,
+//     name: "Basic Tee",
+//     href: "#",
+//     price: "$32.00",
+//     color: "Black",
+//     inStock: false,
+//     leadTime: "3–4 weeks",
+//     size: "Large",
+//     imageSrc:
+//       "https://tailwindcss.com/plus-assets/img/ecommerce-images/shopping-cart-page-01-product-02.jpg",
+//     imageAlt: "Front of men's Basic Tee in black.",
+//   },
+//   {
+//     id: 3,
+//     name: "Nomad Tumbler",
+//     href: "#",
+//     price: "$35.00",
+//     color: "White",
+//     inStock: true,
+//     imageSrc:
+//       "https://tailwindcss.com/plus-assets/img/ecommerce-images/shopping-cart-page-01-product-03.jpg",
+//     imageAlt: "Insulated bottle with white base and black snap lid.",
+//   },
+// ];
 const relatedProducts = [
   {
     id: 1,
@@ -94,6 +102,154 @@ const relatedProducts = [
 
 export default function Example() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { data: session, isPending } = authClient.useSession();
+  const { data: cartSummary } = useQuery({
+    queryKey: ["cart", "summary"],
+    queryFn: () => api.cart.get(),
+    enabled: Boolean(session),
+  });
+
+  const [cartError, setCartError] = useState<string | null>(null);
+  const [cartMessage, setCartMessage] = useState<string | null>(null);
+  const [cartFeedbackItemId, setCartFeedbackItemId] = useState<string | null>(
+    null,
+  );
+
+  const adjustCartItem = useMutation({
+    mutationFn: async ({
+      itemId,
+      delta,
+    }: {
+      itemId: string;
+      delta: -1 | 1;
+    }) => {
+      const response = await api.cart.items({ itemId }).patch({ delta });
+
+      if (response.error) {
+        const message =
+          typeof response.error.value === "object" &&
+          response.error.value &&
+          "error" in response.error.value &&
+          typeof response.error.value.error === "string"
+            ? response.error.value.error
+            : "Could not update this product quantity.";
+
+        throw new Error(message);
+      }
+
+      return response.data;
+    },
+  });
+
+  const removeCartItem = useMutation({
+    mutationFn: async (itemId: string) => {
+      const response = await api.cart.items({ itemId }).delete();
+
+      if (response.error) {
+        const message =
+          typeof response.error.value === "object" &&
+          response.error.value &&
+          "error" in response.error.value &&
+          typeof response.error.value.error === "string"
+            ? response.error.value.error
+            : "Could not remove this product from your cart.";
+
+        throw new Error(message);
+      }
+
+      return response.data;
+    },
+  });
+
+  if (isPending) {
+    return <div>Loading...</div>;
+  }
+
+  const cartItems = cartSummary?.data?.items ?? [];
+  const isCartActionPending =
+    adjustCartItem.isPending || removeCartItem.isPending;
+
+  async function incrementItemQuantity(
+    itemId: string,
+    inventoryQuantity: number,
+  ) {
+    setCartError(null);
+    setCartMessage(null);
+    setCartFeedbackItemId(itemId);
+
+    if (inventoryQuantity <= 0) {
+      setCartError("This variant is currently out of stock.");
+      return;
+    }
+
+    try {
+      await adjustCartItem.mutateAsync({ itemId, delta: 1 });
+      await queryClient.invalidateQueries({ queryKey: ["cart", "summary"] });
+      setCartMessage("Quantity increased.");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Could not increase this product quantity.";
+
+      if (message === "Unauthorized") {
+        router.push(`/sign-in`);
+        return;
+      }
+
+      setCartError(message);
+    }
+  }
+
+  async function decrementItemQuantity(itemId: string) {
+    setCartError(null);
+    setCartMessage(null);
+    setCartFeedbackItemId(itemId);
+
+    try {
+      await adjustCartItem.mutateAsync({ itemId, delta: -1 });
+      await queryClient.invalidateQueries({ queryKey: ["cart", "summary"] });
+      setCartMessage("Quantity decreased.");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Could not remove this product from your cart.";
+
+      if (message === "Unauthorized") {
+        router.push(`/sign-in`);
+        return;
+      }
+
+      setCartError(message);
+    }
+  }
+
+  async function removeItem(itemId: string) {
+    setCartError(null);
+    setCartMessage(null);
+    setCartFeedbackItemId(itemId);
+
+    try {
+      await removeCartItem.mutateAsync(itemId);
+      await queryClient.invalidateQueries({ queryKey: ["cart", "summary"] });
+      setCartFeedbackItemId(null);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Could not remove this product from your cart.";
+
+      if (message === "Unauthorized") {
+        router.push(`/sign-in`);
+        return;
+      }
+
+      setCartError(message);
+    }
+  }
+
   return (
     <>
       <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
@@ -110,12 +266,14 @@ export default function Example() {
             role="list"
             className="divide-y divide-gray-200 border-t border-b border-gray-200"
           >
-            {products.map((product, productIdx) => (
-              <li key={product.id} className="flex py-6 sm:py-10">
+            {cartItems.map((item) => (
+              <li key={item.id} className="flex py-6 sm:py-10">
                 <div className="shrink-0">
-                  <img
-                    alt={product.imageAlt}
-                    src={product.imageSrc}
+                  <Image
+                    alt={item.product.images[0].imageAlt ?? ""}
+                    src={item.product.images[0].imageSrc}
+                    width={1000}
+                    height={1000}
                     className="size-24 rounded-md object-cover sm:size-48"
                   />
                 </div>
@@ -125,67 +283,121 @@ export default function Example() {
                     <div>
                       <div className="flex justify-between">
                         <h3 className="text-sm">
-                          <a
-                            href={product.href}
+                          <Link
+                            href={`/products/${item.product.slug}`}
                             className="font-medium text-gray-700 hover:text-gray-800"
                           >
-                            {product.name}
-                          </a>
+                            {item.product.name}
+                          </Link>
                         </h3>
                       </div>
                       <div className="mt-1 flex text-sm">
-                        <p className="text-gray-500">{product.color}</p>
-                        {product.size ? (
+                        <p className="text-gray-500">
+                          {item.variant?.color?.name}
+                        </p>
+                        {item.variant?.size?.name ? (
                           <p className="ml-4 border-l border-gray-200 pl-4 text-gray-500">
-                            {product.size}
+                            {item.variant?.size?.name}
                           </p>
                         ) : null}
                       </div>
                       <p className="mt-1 text-sm font-medium text-gray-900">
-                        {product.price}
+                        {formatPrice(
+                          Number(item.product.price),
+                          item.product.currency,
+                        )}
                       </p>
                     </div>
 
                     <div className="mt-4 sm:mt-0 sm:pr-9">
-                      <div className="inline-grid w-full max-w-16 grid-cols-1">
-                        <select
-                          id={`quantity-${productIdx}`}
-                          name={`quantity-${productIdx}`}
-                          aria-label={`Quantity, ${product.name}`}
-                          className="col-start-1 row-start-1 appearance-none rounded-md bg-white py-1.5 pr-8 pl-3 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                      <div className="flex w-fit items-center rounded-md bg-white outline-1 -outline-offset-1 outline-gray-300 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-600">
+                        <button
+                          type="button"
+                          aria-label={`Decrease quantity, ${item.product.name}`}
+                          disabled={item.quantity <= 1 || isCartActionPending}
+                          onClick={() => decrementItemQuantity(item.id)}
+                          className="flex size-9 items-center justify-center rounded-l-md text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                          <option value={1}>1</option>
-                          <option value={2}>2</option>
-                          <option value={3}>3</option>
-                          <option value={4}>4</option>
-                          <option value={5}>5</option>
-                          <option value={6}>6</option>
-                          <option value={7}>7</option>
-                          <option value={8}>8</option>
-                        </select>
-                        <ChevronDownIcon
-                          aria-hidden="true"
-                          className="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-gray-500 sm:size-4"
+                          <MinusIcon aria-hidden="true" className="size-4" />
+                        </button>
+                        <input
+                          id={`quantity-${item.id}`}
+                          name={`quantity-${item.id}`}
+                          type="number"
+                          min={1}
+                          max={item.variant?.inventoryQuantity ?? 99}
+                          aria-label={`Quantity, ${item.product.name}`}
+                          className="h-9 w-12 border-x border-gray-300 text-center text-sm text-gray-900 [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          value={item.quantity}
+                          disabled
                         />
+                        <button
+                          type="button"
+                          aria-label={`Increase quantity, ${item.product.name}`}
+                          disabled={
+                            item.quantity >=
+                              (item.variant?.inventoryQuantity ?? 99) ||
+                            isCartActionPending
+                          }
+                          onClick={() =>
+                            incrementItemQuantity(
+                              item.id,
+                              item.variant?.inventoryQuantity ?? 99,
+                            )
+                          }
+                          className="flex size-9 items-center justify-center rounded-r-md text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <PlusIcon aria-hidden="true" className="size-4" />
+                        </button>
                       </div>
+                      {cartFeedbackItemId === item.id &&
+                      (cartError || cartMessage) ? (
+                        <div
+                          role={cartError ? "alert" : "status"}
+                          className={`mt-3 flex items-start gap-2 rounded-md border px-3 py-2 text-sm shadow-xs ${
+                            cartError
+                              ? "border-red-200 bg-red-50 text-red-700"
+                              : "border-green-200 bg-green-50 text-green-700"
+                          }`}
+                        >
+                          <span
+                            className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full ${
+                              cartError ? "bg-red-100" : "bg-green-100"
+                            }`}
+                          >
+                            {cartError ? (
+                              <XMarkIconMini
+                                aria-hidden="true"
+                                className="size-3"
+                              />
+                            ) : (
+                              <CheckIcon
+                                aria-hidden="true"
+                                className="size-3"
+                              />
+                            )}
+                          </span>
+                          <p className="font-medium">
+                            {cartError ?? cartMessage}
+                          </p>
+                        </div>
+                      ) : null}
 
                       <div className="absolute top-0 right-0">
                         <button
                           type="button"
-                          className="-m-2 inline-flex p-2 text-gray-400 hover:text-gray-500"
+                          onClick={() => removeItem(item.id)}
+                          disabled={isCartActionPending}
+                          className="-m-2 inline-flex p-2 text-sm font-medium text-indigo-600 hover:text-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          <span className="sr-only">Remove</span>
-                          <XMarkIconMini
-                            aria-hidden="true"
-                            className="size-5"
-                          />
+                          Remove
                         </button>
                       </div>
                     </div>
                   </div>
 
                   <p className="mt-4 flex space-x-2 text-sm text-gray-700">
-                    {product.inStock ? (
+                    {(item.variant?.inventoryQuantity ?? 0) > 0 ? (
                       <CheckIcon
                         aria-hidden="true"
                         className="size-5 shrink-0 text-green-500"
@@ -198,9 +410,9 @@ export default function Example() {
                     )}
 
                     <span>
-                      {product.inStock
+                      {(item.variant?.inventoryQuantity ?? 0) > 0
                         ? "In stock"
-                        : `Ships in ${product.leadTime}`}
+                        : `Ships in ${item.variant?.leadTime ?? "3-4 weeks"}`}
                     </span>
                   </p>
                 </div>
@@ -290,9 +502,11 @@ export default function Example() {
         <div className="mt-6 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8">
           {relatedProducts.map((relatedProduct) => (
             <div key={relatedProduct.id} className="group relative">
-              <img
+              <Image
                 alt={relatedProduct.imageAlt}
                 src={relatedProduct.imageSrc}
+                width={1000}
+                height={1000}
                 className="aspect-square w-full rounded-md object-cover group-hover:opacity-75 lg:aspect-auto lg:h-80"
               />
               <div className="mt-4 flex justify-between">
