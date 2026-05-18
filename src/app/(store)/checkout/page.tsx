@@ -110,8 +110,45 @@ function OrderTotals({ total }: { total: string }) {
 function CheckoutContent() {
   const searchParams = useSearchParams();
   const paymentStatus = searchParams.get("payment");
+  const stripeSessionId = searchParams.get("session_id");
   const { data: session, isPending: isSessionPending } =
     authClient.useSession();
+  const {
+    data: checkoutCompletion,
+    isLoading: isCompletingCheckout,
+    isError: isCheckoutCompletionError,
+  } = useQuery({
+    queryKey: ["checkout", "stripe", "complete", stripeSessionId],
+    queryFn: async () => {
+      if (!stripeSessionId) {
+        throw new Error("Missing Stripe checkout session.");
+      }
+
+      const response = await fetch(
+        `/api/checkout/stripe/sessions/${stripeSessionId}/complete`,
+        {
+          method: "POST",
+        },
+      );
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof result?.error === "string"
+            ? result.error
+            : "Could not confirm this order.",
+        );
+      }
+
+      return result as {
+        order: {
+          number: string;
+        };
+      };
+    },
+    enabled: Boolean(session && paymentStatus === "success" && stripeSessionId),
+    retry: false,
+  });
   const {
     data: cartSummary,
     isLoading: isCartLoading,
@@ -230,8 +267,13 @@ function CheckoutContent() {
                 role="status"
                 className="mb-6 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-800"
               >
-                Payment successful. Thanks for your order, we&apos;re getting it
-                ready.
+                {isCompletingCheckout
+                  ? "Payment successful. Confirming your order..."
+                  : isCheckoutCompletionError
+                    ? "Payment successful, but we could not confirm the order locally. Please contact support with your Stripe session ID."
+                    : checkoutCompletion?.order
+                      ? `Payment successful. Order ${checkoutCompletion.order.number} is confirmed and we're getting it ready.`
+                      : "Payment successful. Thanks for your order, we're getting it ready."}
               </div>
             ) : null}
 
