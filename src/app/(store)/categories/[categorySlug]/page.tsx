@@ -11,21 +11,27 @@ import {
 } from "@headlessui/react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { ChevronDownIcon, PlusIcon } from "@heroicons/react/20/solid";
+import { useParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/eden";
+import Image from "next/image";
+import Link from "next/link";
+import { formatPrice } from "@/lib/utils";
 
 const breadcrumbs = [{ id: 1, name: "Men", href: "#" }];
 const filters = [
-  {
-    id: "color",
-    name: "Color",
-    options: [
-      { value: "white", label: "White" },
-      { value: "beige", label: "Beige" },
-      { value: "blue", label: "Blue" },
-      { value: "brown", label: "Brown" },
-      { value: "green", label: "Green" },
-      { value: "purple", label: "Purple" },
-    ],
-  },
+  // {
+  //   id: "color",
+  //   name: "Color",
+  //   options: [
+  //     { value: "white", label: "White" },
+  //     { value: "beige", label: "Beige" },
+  //     { value: "blue", label: "Blue" },
+  //     { value: "brown", label: "Brown" },
+  //     { value: "green", label: "Green" },
+  //     { value: "purple", label: "Purple" },
+  //   ],
+  // },
   {
     id: "category",
     name: "Category",
@@ -37,98 +43,128 @@ const filters = [
       { value: "pants-shorts", label: "Pants & Shorts" },
     ],
   },
-  {
-    id: "sizes",
-    name: "Sizes",
-    options: [
-      { value: "xs", label: "XS" },
-      { value: "s", label: "S" },
-      { value: "m", label: "M" },
-      { value: "l", label: "L" },
-      { value: "xl", label: "XL" },
-      { value: "2xl", label: "2XL" },
-    ],
-  },
+  // {
+  //   id: "sizes",
+  //   name: "Sizes",
+  //   options: [
+  //     { value: "xs", label: "XS" },
+  //     { value: "s", label: "S" },
+  //     { value: "m", label: "M" },
+  //     { value: "l", label: "L" },
+  //     { value: "xl", label: "XL" },
+  //     { value: "2xl", label: "2XL" },
+  //   ],
+  // },
 ];
-const products = [
-  {
-    id: 1,
-    name: "Basic Tee 8-Pack",
-    href: "#",
-    price: "$256",
-    description:
-      "Get the full lineup of our Basic Tees. Have a fresh shirt all week, and an extra for laundry day.",
-    options: "8 colors",
-    imageSrc:
-      "https://tailwindcss.com/plus-assets/img/ecommerce-images/category-page-02-image-card-01.jpg",
-    imageAlt:
-      "Eight shirts arranged on table in black, olive, grey, blue, white, red, mustard, and green.",
-  },
-  {
-    id: 2,
-    name: "Basic Tee",
-    href: "#",
-    price: "$32",
-    description:
-      "Look like a visionary CEO and wear the same black t-shirt every day.",
-    options: "Black",
-    imageSrc:
-      "https://tailwindcss.com/plus-assets/img/ecommerce-images/category-page-02-image-card-02.jpg",
-    imageAlt: "Front of plain black t-shirt.",
-  },
-  {
-    id: 3,
-    name: "Kinda White Basic Tee",
-    href: "#",
-    price: "$32",
-    description: "It's probably, like, 5000 Kelvin instead of 6000 K.",
-    options: "White",
-    imageSrc:
-      "https://tailwindcss.com/plus-assets/img/ecommerce-images/category-page-02-image-card-03.jpg",
-    imageAlt: "Front of plain white t-shirt.",
-  },
-  {
-    id: 4,
-    name: "Stone Basic Tee",
-    href: "#",
-    price: "$32",
-    description:
-      "White tees stain easily, and black tees fade. This is going to be gray for a while.",
-    options: "Charcoal",
-    imageSrc:
-      "https://tailwindcss.com/plus-assets/img/ecommerce-images/category-page-02-image-card-04.jpg",
-    imageAlt: "Front of plain dark gray t-shirt.",
-  },
-  {
-    id: 5,
-    name: "Fall Basic Tee 3-Pack",
-    href: "#",
-    price: "$96",
-    description:
-      "Who need stark minimalism when you could have earth tones? Embrace the season.",
-    options: "Charcoal",
-    imageSrc:
-      "https://tailwindcss.com/plus-assets/img/ecommerce-images/category-page-02-image-card-05.jpg",
-    imageAlt:
-      "Three shirts arranged on table in mustard, dark gray, and olive.",
-  },
-  {
-    id: 6,
-    name: "Linework Artwork Tee 3-Pack",
-    href: "#",
-    price: "$108",
-    description:
-      "Get all 3 colors of our popular Linework design and some variety to your monotonous life.",
-    options: "3 colors",
-    imageSrc:
-      "https://tailwindcss.com/plus-assets/img/ecommerce-images/category-page-02-image-card-06.jpg",
-    imageAlt:
-      "Three shirts in gray, white, and blue arranged on table with same line drawing of hands and shapes overlapping on front of shirt.",
-  },
-];
+// const products = [
+//   {
+//     id: 1,
+//     name: "Basic Tee 8-Pack",
+//     href: "#",
+//     price: "$256",
+//     description:
+//       "Get the full lineup of our Basic Tees. Have a fresh shirt all week, and an extra for laundry day.",
+//     options: "8 colors",
+//     imageSrc:
+//       "https://tailwindcss.com/plus-assets/img/ecommerce-images/category-page-02-image-card-01.jpg",
+//     imageAlt:
+//       "Eight shirts arranged on table in black, olive, grey, blue, white, red, mustard, and green.",
+//   },
+//   {
+//     id: 2,
+//     name: "Basic Tee",
+//     href: "#",
+//     price: "$32",
+//     description:
+//       "Look like a visionary CEO and wear the same black t-shirt every day.",
+//     options: "Black",
+//     imageSrc:
+//       "https://tailwindcss.com/plus-assets/img/ecommerce-images/category-page-02-image-card-02.jpg",
+//     imageAlt: "Front of plain black t-shirt.",
+//   },
+//   {
+//     id: 3,
+//     name: "Kinda White Basic Tee",
+//     href: "#",
+//     price: "$32",
+//     description: "It's probably, like, 5000 Kelvin instead of 6000 K.",
+//     options: "White",
+//     imageSrc:
+//       "https://tailwindcss.com/plus-assets/img/ecommerce-images/category-page-02-image-card-03.jpg",
+//     imageAlt: "Front of plain white t-shirt.",
+//   },
+//   {
+//     id: 4,
+//     name: "Stone Basic Tee",
+//     href: "#",
+//     price: "$32",
+//     description:
+//       "White tees stain easily, and black tees fade. This is going to be gray for a while.",
+//     options: "Charcoal",
+//     imageSrc:
+//       "https://tailwindcss.com/plus-assets/img/ecommerce-images/category-page-02-image-card-04.jpg",
+//     imageAlt: "Front of plain dark gray t-shirt.",
+//   },
+//   {
+//     id: 5,
+//     name: "Fall Basic Tee 3-Pack",
+//     href: "#",
+//     price: "$96",
+//     description:
+//       "Who need stark minimalism when you could have earth tones? Embrace the season.",
+//     options: "Charcoal",
+//     imageSrc:
+//       "https://tailwindcss.com/plus-assets/img/ecommerce-images/category-page-02-image-card-05.jpg",
+//     imageAlt:
+//       "Three shirts arranged on table in mustard, dark gray, and olive.",
+//   },
+//   {
+//     id: 6,
+//     name: "Linework Artwork Tee 3-Pack",
+//     href: "#",
+//     price: "$108",
+//     description:
+//       "Get all 3 colors of our popular Linework design and some variety to your monotonous life.",
+//     options: "3 colors",
+//     imageSrc:
+//       "https://tailwindcss.com/plus-assets/img/ecommerce-images/category-page-02-image-card-06.jpg",
+//     imageAlt:
+//       "Three shirts in gray, white, and blue arranged on table with same line drawing of hands and shapes overlapping on front of shirt.",
+//   },
+// ];
 
 export default function Example() {
+  const { categorySlug } = useParams<{ categorySlug: string }>();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
+  // Filters state
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+
+  const { data: colors } = useQuery({
+    queryKey: ["categories", categorySlug, "colors"],
+    queryFn: () => api.categories({ slug: categorySlug }).colors.get(),
+  });
+
+  const { data: sizes } = useQuery({
+    queryKey: ["categories", categorySlug, "sizes"],
+    queryFn: () => api.categories({ slug: categorySlug }).sizes.get(),
+  });
+
+  const { data: category } = useQuery({
+    queryKey: ["categories", categorySlug, selectedColors],
+    queryFn: () => api.categories({ slug: categorySlug }).get(),
+  });
+
+  const { data: products } = useQuery({
+    queryKey: ["products", categorySlug, selectedColors, selectedSizes],
+    queryFn: () =>
+      api.products.post({
+        categorySlug: categorySlug,
+        colors: selectedColors,
+        sizes: selectedSizes,
+      }),
+  });
 
   return (
     <>
@@ -271,7 +307,7 @@ export default function Example() {
                   aria-current="page"
                   className="font-medium text-gray-500 hover:text-gray-600"
                 >
-                  New Arrivals
+                  {category?.data?.name}
                 </a>
               </li>
             </ol>
@@ -281,11 +317,10 @@ export default function Example() {
         <main className="mx-auto max-w-2xl px-4 lg:max-w-7xl lg:px-8">
           <div className="border-b border-gray-200 pt-24 pb-10">
             <h1 className="text-4xl font-bold tracking-tight text-gray-900">
-              New Arrivals
+              {category?.data?.name}
             </h1>
             <p className="mt-4 text-base text-gray-500">
-              Checkout out the latest release of Basic Tees, new and improved
-              with four openings!
+              {category?.data?.description}
             </p>
           </div>
 
@@ -364,6 +399,137 @@ export default function Example() {
                       </fieldset>
                     </div>
                   ))}
+                  {/* colors filter */}
+                  <div className="py-10 first:pt-0 last:pb-0">
+                    <fieldset>
+                      <legend className="block text-sm font-medium text-gray-900">
+                        Colors
+                      </legend>
+                      <div className="space-y-3 pt-6">
+                        {colors?.data?.map((color, optionIdx) => (
+                          <div key={color.id} className="flex gap-3">
+                            <div className="flex h-5 shrink-0 items-center">
+                              <div className="group grid size-4 grid-cols-1">
+                                <input
+                                  checked={selectedColors.includes(color.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedColors([
+                                        ...selectedColors,
+                                        color.id,
+                                      ]);
+                                    } else {
+                                      setSelectedColors(
+                                        selectedColors.filter(
+                                          (id) => id !== color.id,
+                                        ),
+                                      );
+                                    }
+                                  }}
+                                  id={`colors-${color.id}`}
+                                  name="colors[]"
+                                  type="checkbox"
+                                  className="col-start-1 row-start-1 appearance-none rounded-sm border border-gray-300 bg-white checked:border-indigo-600 checked:bg-indigo-600 indeterminate:border-indigo-600 indeterminate:bg-indigo-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:border-gray-300 disabled:bg-gray-100 disabled:checked:bg-gray-100 forced-colors:appearance-auto"
+                                />
+                                <svg
+                                  fill="none"
+                                  viewBox="0 0 14 14"
+                                  className="pointer-events-none col-start-1 row-start-1 size-3.5 self-center justify-self-center stroke-white group-has-disabled:stroke-gray-950/25"
+                                >
+                                  <path
+                                    d="M3 8L6 11L11 3.5"
+                                    strokeWidth={2}
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="opacity-0 group-has-checked:opacity-100"
+                                  />
+                                  <path
+                                    d="M3 7H11"
+                                    strokeWidth={2}
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="opacity-0 group-has-indeterminate:opacity-100"
+                                  />
+                                </svg>
+                              </div>
+                            </div>
+                            <label
+                              htmlFor={`colors-${color.id}`}
+                              className="text-sm text-gray-600"
+                            >
+                              {color.name}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </fieldset>
+                  </div>
+
+                  {/* sizes filter */}
+                  <div className="py-10 first:pt-0 last:pb-0">
+                    <fieldset>
+                      <legend className="block text-sm font-medium text-gray-900">
+                        Sizes
+                      </legend>
+                      <div className="space-y-3 pt-6">
+                        {sizes?.data?.map((size, optionIdx) => (
+                          <div key={size.id} className="flex gap-3">
+                            <div className="flex h-5 shrink-0 items-center">
+                              <div className="group grid size-4 grid-cols-1">
+                                <input
+                                  checked={selectedSizes.includes(size.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedSizes([
+                                        ...selectedSizes,
+                                        size.id,
+                                      ]);
+                                    } else {
+                                      setSelectedSizes(
+                                        selectedSizes.filter(
+                                          (id) => id !== size.id,
+                                        ),
+                                      );
+                                    }
+                                  }}
+                                  id={`sizes-${size.id}`}
+                                  name="sizes[]"
+                                  type="checkbox"
+                                  className="col-start-1 row-start-1 appearance-none rounded-sm border border-gray-300 bg-white checked:border-indigo-600 checked:bg-indigo-600 indeterminate:border-indigo-600 indeterminate:bg-indigo-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:border-gray-300 disabled:bg-gray-100 disabled:checked:bg-gray-100 forced-colors:appearance-auto"
+                                />
+                                <svg
+                                  fill="none"
+                                  viewBox="0 0 14 14"
+                                  className="pointer-events-none col-start-1 row-start-1 size-3.5 self-center justify-self-center stroke-white group-has-disabled:stroke-gray-950/25"
+                                >
+                                  <path
+                                    d="M3 8L6 11L11 3.5"
+                                    strokeWidth={2}
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="opacity-0 group-has-checked:opacity-100"
+                                  />
+                                  <path
+                                    d="M3 7H11"
+                                    strokeWidth={2}
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="opacity-0 group-has-indeterminate:opacity-100"
+                                  />
+                                </svg>
+                              </div>
+                            </div>
+                            <label
+                              htmlFor={`sizes-${size.id}`}
+                              className="text-sm text-gray-600"
+                            >
+                              {size.name}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </fieldset>
+                  </div>
                 </form>
               </div>
             </aside>
@@ -376,36 +542,41 @@ export default function Example() {
                 Products
               </h2>
 
+              {/* <pre className="text-xs text-gray-500">
+                {JSON.stringify(products, null, 2)}
+              </pre> */}
               <div className="grid grid-cols-1 gap-y-4 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-10 lg:gap-x-8 xl:grid-cols-3">
-                {products.map((product) => (
+                {products?.data?.map((product) => (
                   <div
                     key={product.id}
                     className="group relative flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white"
                   >
-                    <img
-                      alt={product.imageAlt}
-                      src={product.imageSrc}
+                    <Image
+                      alt={product.images[0].imageAlt ?? ""}
+                      src={product.images[0].imageSrc ?? ""}
+                      width={1000}
+                      height={1000}
                       className="aspect-3/4 bg-gray-200 object-cover group-hover:opacity-75 sm:h-96"
                     />
                     <div className="flex flex-1 flex-col space-y-2 p-4">
                       <h3 className="text-sm font-medium text-gray-900">
-                        <a href={product.href}>
+                        <Link href={`/products/${product.slug}`}>
                           <span
                             aria-hidden="true"
                             className="absolute inset-0"
                           />
                           {product.name}
-                        </a>
+                        </Link>
                       </h3>
                       <p className="text-sm text-gray-500">
                         {product.description}
                       </p>
                       <div className="flex flex-1 flex-col justify-end">
-                        <p className="text-sm text-gray-500 italic">
+                        {/* <p className="text-sm text-gray-500 italic">
                           {product.options}
-                        </p>
+                        </p> */}
                         <p className="text-base font-medium text-gray-900">
-                          {product.price}
+                          {formatPrice(Number(product.price), product.currency)}
                         </p>
                       </div>
                     </div>
