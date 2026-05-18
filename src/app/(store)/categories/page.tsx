@@ -8,7 +8,7 @@ import Link from "next/link";
 export default function Page() {
   const { data: categories } = useQuery({
     queryKey: ["store", "categories"],
-    queryFn: () => api.store.categories.get(),
+    queryFn: () => api.categories.get(),
   });
 
   return (
