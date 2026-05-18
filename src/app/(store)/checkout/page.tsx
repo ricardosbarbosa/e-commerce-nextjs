@@ -1,67 +1,136 @@
+"use client";
+
+import { api } from "@/lib/eden";
+import { formatPrice } from "@/lib/utils";
 import {
   Disclosure,
   DisclosureButton,
   DisclosurePanel,
 } from "@headlessui/react";
 import { LockClosedIcon } from "@heroicons/react/20/solid";
+import { useQuery } from "@tanstack/react-query";
+import Image from "next/image";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-const subtotal = "$210.00";
-const discount = { code: "CHEAPSKATE", amount: "$24.00" };
-const taxes = "$23.68";
-const shipping = "$22.00";
-const total = "$341.68";
-const products = [
-  {
-    id: 1,
-    name: "Micro Backpack",
-    href: "#",
-    price: "$70.00",
-    color: "Moss",
-    size: "5L",
-    imageSrc:
-      "https://tailwindcss.com/plus-assets/img/ecommerce-images/checkout-page-04-product-01.jpg",
-    imageAlt:
-      "Moss green canvas compact backpack with double top zipper, zipper front pouch, and matching carry handle and backpack straps.",
-  },
-  {
-    id: 2,
-    name: "Small Stuff Satchel",
-    href: "#",
-    price: "$180.00",
-    color: "Sand",
-    size: "18L",
-    imageSrc:
-      "https://tailwindcss.com/plus-assets/img/ecommerce-images/checkout-page-04-product-02.jpg",
-    imageAlt:
-      "Front of satchel with tan canvas body, straps, handle, drawstring top, and front zipper pouch.",
-  },
-  {
-    id: 3,
-    name: "Carry Clutch",
-    href: "#",
-    price: "$70.00",
-    color: "White and Black",
-    size: "Small",
-    imageSrc:
-      "https://tailwindcss.com/plus-assets/img/ecommerce-images/checkout-page-04-product-03.jpg",
-    imageAlt:
-      "Folding zipper clutch with white fabric body, synthetic black leather accent strip, and black loop zipper pull.",
-  },
-];
+import { authClient } from "@/lib/auth-client";
 
-type CheckoutPageProps = {
-  searchParams: Promise<{
-    payment?: string | string[];
-    session_id?: string | string[];
-  }>;
-};
-
-function searchParamValue(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] : value;
+function getCartItemUnitPrice(item: CartItem) {
+  return Number(item.variant?.price ?? item.product.price);
 }
 
-export default async function Example({ searchParams }: CheckoutPageProps) {
-  const paymentStatus = searchParamValue((await searchParams).payment);
+type CartSummary = NonNullable<
+  Awaited<ReturnType<typeof api.cart.get>>["data"]
+>;
+
+type CartItem = NonNullable<CartSummary["items"]>[number];
+
+function cartItemImage(item: CartItem) {
+  return item.product.images[0];
+}
+
+function OrderItems({
+  items,
+  className = "divide-y divide-gray-200 border-b border-gray-200",
+}: {
+  items: CartItem[];
+  className?: string;
+}) {
+  return (
+    <ul role="list" className={className}>
+      {items.map((item) => {
+        const image = cartItemImage(item);
+
+        return (
+          <li key={item.id} className="flex space-x-6 py-6">
+            {image ? (
+              <Image
+                alt={image.imageAlt ?? ""}
+                src={image.imageSrc}
+                width={160}
+                height={160}
+                className="size-40 flex-none rounded-md bg-gray-200 object-cover"
+              />
+            ) : (
+              <div className="size-40 flex-none rounded-md bg-gray-200" />
+            )}
+            <div className="flex flex-col justify-between space-y-4">
+              <div className="space-y-1 text-sm font-medium">
+                <h3 className="text-gray-900">
+                  <Link href={`/products/${item.product.slug}`}>
+                    {item.product.name}
+                  </Link>
+                </h3>
+                <p className="text-gray-900">
+                  {formatPrice(
+                    getCartItemUnitPrice(item),
+                    item.product.currency,
+                  )}
+                </p>
+                {item.variant?.color?.name ? (
+                  <p className="text-gray-500">{item.variant.color.name}</p>
+                ) : null}
+                {item.variant?.size?.name ? (
+                  <p className="text-gray-500">{item.variant.size.name}</p>
+                ) : null}
+                <p className="text-gray-500">Qty {item.quantity}</p>
+              </div>
+              <div>
+                <Link
+                  href="/cart"
+                  className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+                >
+                  Edit in cart
+                </Link>
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function OrderTotals({ total }: { total: string }) {
+  return (
+    <dl className="mt-10 space-y-6 text-sm font-medium text-gray-500">
+      <div className="flex justify-between">
+        <dt>Subtotal</dt>
+        <dd className="text-gray-900">{total}</dd>
+      </div>
+      <div className="flex items-center justify-between border-t border-gray-200 pt-6 text-gray-900">
+        <dt className="text-base">Total</dt>
+        <dd className="text-base">{total}</dd>
+      </div>
+    </dl>
+  );
+}
+
+function CheckoutContent() {
+  const searchParams = useSearchParams();
+  const paymentStatus = searchParams.get("payment");
+  const { data: session, isPending: isSessionPending } =
+    authClient.useSession();
+  const {
+    data: cartSummary,
+    isLoading: isCartLoading,
+    isError: isCartError,
+  } = useQuery({
+    queryKey: ["cart", "summary"],
+    queryFn: () => api.cart.get(),
+    enabled: Boolean(session),
+  });
+
+  const cartItems = cartSummary?.data?.items ?? [];
+  const cartCurrency = cartItems[0]?.product.currency ?? "USD";
+  const cartSubtotal = cartItems.reduce(
+    (sum, item) => sum + getCartItemUnitPrice(item) * item.quantity,
+    0,
+  );
+  const formattedTotal = formatPrice(cartSubtotal, cartCurrency);
+  const isLoading = isSessionPending || isCartLoading;
+  const canSubmitCheckout = Boolean(session) && cartItems.length > 0;
 
   return (
     <>
@@ -70,9 +139,11 @@ export default async function Example({ searchParams }: CheckoutPageProps) {
           <div className="mx-auto flex max-w-lg">
             <a href="#">
               <span className="sr-only">Your Company</span>
-              <img
+              <Image
                 alt=""
                 src="https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=indigo&shade=600"
+                width={32}
+                height={32}
                 className="h-8 w-auto"
               />
             </a>
@@ -105,96 +176,13 @@ export default async function Example({ searchParams }: CheckoutPageProps) {
             </div>
 
             <DisclosurePanel>
-              <ul
-                role="list"
-                className="divide-y divide-gray-200 border-b border-gray-200"
-              >
-                {products.map((product) => (
-                  <li key={product.id} className="flex space-x-6 py-6">
-                    <img
-                      alt={product.imageAlt}
-                      src={product.imageSrc}
-                      className="size-40 flex-none rounded-md bg-gray-200 object-cover"
-                    />
-                    <div className="flex flex-col justify-between space-y-4">
-                      <div className="space-y-1 text-sm font-medium">
-                        <h3 className="text-gray-900">{product.name}</h3>
-                        <p className="text-gray-900">{product.price}</p>
-                        <p className="text-gray-500">{product.color}</p>
-                        <p className="text-gray-500">{product.size}</p>
-                      </div>
-                      <div className="flex space-x-4">
-                        <button
-                          type="button"
-                          className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
-                        >
-                          Edit
-                        </button>
-                        <div className="flex border-l border-gray-300 pl-4">
-                          <button
-                            type="button"
-                            className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-
-              <form className="mt-10">
-                <label
-                  htmlFor="discount-code-mobile"
-                  className="block text-sm/6 font-medium text-gray-700"
-                >
-                  Discount code
-                </label>
-                <div className="mt-1 flex space-x-4">
-                  <input
-                    id="discount-code-mobile"
-                    name="discount-code-mobile"
-                    type="text"
-                    className="block w-full rounded-md bg-white px-3 py-2 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
-                  />
-                  <button
-                    type="submit"
-                    className="rounded-md bg-gray-200 px-4 text-sm font-medium text-gray-600 hover:bg-gray-300 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-50 focus:outline-hidden"
-                  >
-                    Apply
-                  </button>
-                </div>
-              </form>
-
-              <dl className="mt-10 space-y-6 text-sm font-medium text-gray-500">
-                <div className="flex justify-between">
-                  <dt>Subtotal</dt>
-                  <dd className="text-gray-900">{subtotal}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="flex">
-                    Discount
-                    <span className="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-xs tracking-wide text-gray-600">
-                      {discount.code}
-                    </span>
-                  </dt>
-                  <dd className="text-gray-900">-{discount.amount}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt>Taxes</dt>
-                  <dd className="text-gray-900">{taxes}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt>Shipping</dt>
-                  <dd className="text-gray-900">{shipping}</dd>
-                </div>
-              </dl>
+              <OrderItems items={cartItems} />
+              <OrderTotals total={formattedTotal} />
             </DisclosurePanel>
 
             <p className="mt-6 flex items-center justify-between border-t border-gray-200 pt-6 text-sm font-medium text-gray-900">
               <span className="text-base">Total</span>
-              <span className="text-base">{total}</span>
+              <span className="text-base">{formattedTotal}</span>
             </p>
           </Disclosure>
         </section>
@@ -208,96 +196,13 @@ export default async function Example({ searchParams }: CheckoutPageProps) {
             Order summary
           </h2>
 
-          <ul
-            role="list"
+          <OrderItems
+            items={cartItems}
             className="flex-auto divide-y divide-gray-200 overflow-y-auto px-6"
-          >
-            {products.map((product) => (
-              <li key={product.id} className="flex space-x-6 py-6">
-                <img
-                  alt={product.imageAlt}
-                  src={product.imageSrc}
-                  className="size-40 flex-none rounded-md bg-gray-200 object-cover"
-                />
-                <div className="flex flex-col justify-between space-y-4">
-                  <div className="space-y-1 text-sm font-medium">
-                    <h3 className="text-gray-900">{product.name}</h3>
-                    <p className="text-gray-900">{product.price}</p>
-                    <p className="text-gray-500">{product.color}</p>
-                    <p className="text-gray-500">{product.size}</p>
-                  </div>
-                  <div className="flex space-x-4">
-                    <button
-                      type="button"
-                      className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
-                    >
-                      Edit
-                    </button>
-                    <div className="flex border-l border-gray-300 pl-4">
-                      <button
-                        type="button"
-                        className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+          />
 
           <div className="sticky bottom-0 flex-none border-t border-gray-200 bg-gray-50 p-6">
-            <form>
-              <label
-                htmlFor="discount-code"
-                className="block text-sm/6 font-medium text-gray-700"
-              >
-                Discount code
-              </label>
-              <div className="mt-1 flex space-x-4">
-                <input
-                  id="discount-code"
-                  name="discount-code"
-                  type="text"
-                  className="block w-full rounded-md bg-white px-3 py-2 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
-                />
-                <button
-                  type="submit"
-                  className="rounded-md bg-gray-200 px-4 text-sm font-medium text-gray-600 hover:bg-gray-300 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-50 focus:outline-hidden"
-                >
-                  Apply
-                </button>
-              </div>
-            </form>
-
-            <dl className="mt-10 space-y-6 text-sm font-medium text-gray-500">
-              <div className="flex justify-between">
-                <dt>Subtotal</dt>
-                <dd className="text-gray-900">{subtotal}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="flex">
-                  Discount
-                  <span className="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-xs tracking-wide text-gray-600">
-                    {discount.code}
-                  </span>
-                </dt>
-                <dd className="text-gray-900">-{discount.amount}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt>Taxes</dt>
-                <dd className="text-gray-900">{taxes}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt>Shipping</dt>
-                <dd className="text-gray-900">{shipping}</dd>
-              </div>
-              <div className="flex items-center justify-between border-t border-gray-200 pt-6 text-gray-900">
-                <dt className="text-base">Total</dt>
-                <dd className="text-base">{total}</dd>
-              </div>
-            </dl>
+            <OrderTotals total={formattedTotal} />
           </div>
         </section>
 
@@ -310,9 +215,11 @@ export default async function Example({ searchParams }: CheckoutPageProps) {
             <div className="hidden pt-10 pb-16 lg:flex">
               <a href="#">
                 <span className="sr-only">Your Company</span>
-                <img
+                <Image
                   alt=""
                   src="https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=indigo&shade=600"
+                  width={32}
+                  height={32}
                   className="h-8 w-auto"
                 />
               </a>
@@ -347,6 +254,50 @@ export default async function Example({ searchParams }: CheckoutPageProps) {
                 payment methods, including cards and supported wallets.
               </p>
             </div>
+
+            {isLoading ? (
+              <div
+                role="status"
+                className="mt-6 rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-600"
+              >
+                Loading your cart...
+              </div>
+            ) : null}
+
+            {!isLoading && !session ? (
+              <div
+                role="alert"
+                className="mt-6 rounded-md border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800"
+              >
+                Sign in before checking out.{" "}
+                <Link href="/sign-in" className="font-medium underline">
+                  Go to sign in
+                </Link>
+                .
+              </div>
+            ) : null}
+
+            {!isLoading && session && isCartError ? (
+              <div
+                role="alert"
+                className="mt-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+              >
+                Could not load your cart. Please refresh and try again.
+              </div>
+            ) : null}
+
+            {!isLoading && session && cartItems.length === 0 ? (
+              <div
+                role="status"
+                className="mt-6 rounded-md border border-gray-200 bg-white p-4 text-sm text-gray-600"
+              >
+                Your cart is empty.{" "}
+                <Link href="/products" className="font-medium text-indigo-600">
+                  Continue shopping
+                </Link>
+                .
+              </div>
+            ) : null}
 
             <form action="/api/checkout/stripe" method="post" className="mt-6">
               <div className="grid grid-cols-12 gap-x-4 gap-y-6">
@@ -483,9 +434,10 @@ export default async function Example({ searchParams }: CheckoutPageProps) {
 
               <button
                 type="submit"
+                disabled={!canSubmitCheckout}
                 className="mt-6 w-full rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-xs hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden"
               >
-                Pay {total}
+                Pay {formattedTotal}
               </button>
 
               <p className="mt-6 flex justify-center text-sm font-medium text-gray-500">
@@ -500,5 +452,19 @@ export default async function Example({ searchParams }: CheckoutPageProps) {
         </section>
       </main>
     </>
+  );
+}
+
+export default function Example() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-96 items-center justify-center px-4 py-16 text-sm text-gray-600">
+          Loading checkout...
+        </main>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
   );
 }
