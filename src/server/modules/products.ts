@@ -1,6 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
 import { prismaPlugin } from "@/server/plugins/prisma";
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import * as z from "zod";
 
 export const productsModule = new Elysia({
@@ -52,8 +52,167 @@ export const productsModule = new Elysia({
         sizes: z.array(z.string()).optional(),
       }),
       detail: {
-        summary: "Get categories",
-        tags: ["Categories"],
+        summary: "Get products",
+        tags: ["Products"],
+      },
+    },
+  )
+  .get(
+    "/:slug",
+    ({ prisma, params }) => {
+      return prisma.product.findUnique({
+        where: { slug: params.slug },
+        include: {
+          images: true,
+          variants: {
+            include: {
+              color: true,
+              size: true,
+              images: true,
+            },
+          },
+          reviews: {
+            take: 1,
+            orderBy: {
+              publishedAt: "desc",
+            },
+          },
+          recommendations: {
+            include: {
+              recommendedProduct: {
+                include: {
+                  images: true,
+                  variants: {
+                    include: {
+                      color: true,
+                      size: true,
+                      images: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    },
+    {
+      params: z.object({
+        slug: z.string(),
+      }),
+      detail: {
+        summary: "Get product by id",
+        tags: ["Products"],
+      },
+    },
+  )
+  .get(
+    "/:slug/colors",
+    ({ prisma, params }) => {
+      return prisma.productColor.findMany({
+        where: {
+          variants: {
+            some: {
+              product: {
+                slug: params.slug,
+              },
+            },
+          },
+        },
+        orderBy: {
+          name: "asc",
+        },
+      });
+    },
+    {
+      params: z.object({
+        slug: z.string(),
+      }),
+      detail: {
+        summary: "Get colors by product slug",
+        tags: ["Products"],
+      },
+    },
+  )
+  .get(
+    "/:slug/sizes",
+    ({ prisma, params }) => {
+      return prisma.productSize.findMany({
+        where: {
+          variants: {
+            some: {
+              product: {
+                slug: params.slug,
+              },
+            },
+          },
+        },
+        orderBy: {
+          sortOrder: "asc",
+        },
+      });
+    },
+    {
+      params: t.Object({
+        slug: t.String(),
+      }),
+      detail: {
+        summary: "Get sizes by product slug",
+        tags: ["Products"],
+      },
+    },
+  )
+  .get(
+    // should return the total count and the average rating and the reviews paginated
+    "/:slug/reviews",
+    async ({ prisma, params, query }) => {
+      const { page = "1", limit = "10" } = query;
+
+      const totalCount = await prisma.productReview.count({
+        where: { product: { slug: params.slug } },
+      });
+      const averageRating = await prisma.productReview
+        .aggregate({
+          where: { product: { slug: params.slug } },
+          _avg: { rating: true },
+        })
+        .then((result) => result._avg.rating ?? 0);
+
+      const reviews = await prisma.productReview.findMany({
+        where: { product: { slug: params.slug } },
+        select: {
+          id: true,
+          authorName: true,
+          title: true,
+          content: true,
+          rating: true,
+          publishedAt: true,
+        },
+        orderBy: {
+          publishedAt: "desc",
+        },
+        skip: (Number(page) - 1) * Number(limit),
+        take: Number(limit),
+      });
+
+      return {
+        totalCount,
+        averageRating,
+        reviews,
+      };
+    },
+    {
+      params: z.object({
+        slug: z.string(),
+      }),
+      // query params are strings by default
+      query: z.object({
+        page: z.string().optional(),
+        limit: z.string().optional(),
+      }),
+      detail: {
+        summary: "Get reviews by product slug paginated",
+        tags: ["Products", "Reviews"],
       },
     },
   );
