@@ -202,6 +202,12 @@ export default function Header({
                 ) : (
                   <div className="hidden lg:flex lg:flex-1 lg:items-center lg:justify-end lg:space-x-6">
                     <Link
+                      href="/orders"
+                      className="text-sm font-medium text-gray-700 hover:text-gray-800"
+                    >
+                      Orders
+                    </Link>
+                    <Link
                       href="/account"
                       className="text-sm font-medium text-gray-700 hover:text-gray-800"
                     >
