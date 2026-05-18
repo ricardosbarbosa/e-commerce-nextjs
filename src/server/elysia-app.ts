@@ -9,6 +9,7 @@ import { healthModule } from "./modules/health";
 import { categoriesModule } from "./modules/categories";
 import { echoBodySchema } from "./schemas/echo";
 import { productsModule } from "./modules/products";
+import { cartModule } from "./modules/cart";
 
 // Mounted by `src/app/api/[[...slugs]]/route.ts` at `/api`.
 export const apiApp = new Elysia({ prefix: "/api" })
@@ -26,6 +27,7 @@ export const apiApp = new Elysia({ prefix: "/api" })
         tags: [
           { name: "General", description: "Rotas gerais" },
           { name: "Checkout", description: "Stripe checkout" },
+          { name: "Cart", description: "Shopping cart management" },
         ],
       },
     }),
@@ -54,6 +56,7 @@ export const apiApp = new Elysia({ prefix: "/api" })
   .use(checkoutModule)
   .use(healthModule)
   .use(categoriesModule)
-  .use(productsModule);
+  .use(productsModule)
+  .use(cartModule);
 
 export type ApiApp = typeof apiApp;
