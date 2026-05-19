@@ -69,12 +69,20 @@ export default function SignInPage() {
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label
-            htmlFor="sign-in-password"
-            className="text-sm font-medium text-zinc-800 dark:text-zinc-200"
-          >
-            Password
-          </label>
+          <div className="flex items-center justify-between gap-3">
+            <label
+              htmlFor="sign-in-password"
+              className="text-sm font-medium text-zinc-800 dark:text-zinc-200"
+            >
+              Password
+            </label>
+            <Link
+              href="/forgot-password"
+              className="text-sm font-medium text-zinc-600 underline-offset-4 hover:text-zinc-950 hover:underline dark:text-zinc-400 dark:hover:text-zinc-50"
+            >
+              Forgot password?
+            </Link>
+          </div>
           <input
             id="sign-in-password"
             name="password"

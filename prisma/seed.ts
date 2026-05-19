@@ -21,6 +21,13 @@ const pool = new Pool({
 });
 
 const userId = "gHNtel8EfqtFxEDzHS7ajOcgbxJ7aRo2";
+const adminUser = {
+  id: userId,
+  name: "Store Admin",
+  email: "admin@example.com",
+  emailVerified: true,
+  role: "admin",
+};
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg(pool),
@@ -1008,6 +1015,25 @@ const orderSeeds: OrderSeed[] = [
   },
 ];
 
+async function seedAdminUser() {
+  await prisma.user.upsert({
+    where: { id: adminUser.id },
+    update: {
+      name: adminUser.name,
+      email: adminUser.email,
+      emailVerified: adminUser.emailVerified,
+      role: adminUser.role,
+      banned: false,
+      banReason: null,
+      banExpires: null,
+    },
+    create: {
+      ...adminUser,
+      banned: false,
+    },
+  });
+}
+
 async function seedCategories() {
   const categoryIds = new Map<string, string>();
 
@@ -1448,6 +1474,7 @@ async function seedOrders({ productIds }: { productIds: Map<string, string> }) {
 }
 
 async function main() {
+  await seedAdminUser();
   const categoryIds = await seedCategories();
   const { colorIds, sizeIds } = await seedOptions();
   const collectionIds = await seedCollections();

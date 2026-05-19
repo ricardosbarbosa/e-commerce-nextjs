@@ -223,6 +223,15 @@ export default function Header({
                     >
                       Log out
                     </Link>
+                    {/* if admin, show admin link */}
+                    {session.user.role === "admin" && (
+                      <Link
+                        href="/admin"
+                        className="text-sm font-medium text-gray-700 hover:text-gray-800"
+                      >
+                        Admin
+                      </Link>
+                    )}
                   </div>
                 )}
 
