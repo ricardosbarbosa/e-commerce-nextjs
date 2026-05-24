@@ -6,8 +6,10 @@ import { Button, SecondaryButton, inputClassName } from "./ui";
 
 export function ProductImageUpload({
   onUploaded,
+  uploadPath = "/api/admin/uploads/product-images",
 }: {
   onUploaded: (url: string) => void;
+  uploadPath?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -26,7 +28,7 @@ export function ProductImageUpload({
 
     try {
       const response = await fetch(
-        `/api/admin/uploads/product-images?filename=${encodeURIComponent(file.name)}`,
+        `${uploadPath}?filename=${encodeURIComponent(file.name)}`,
         {
           method: "POST",
           body: file,

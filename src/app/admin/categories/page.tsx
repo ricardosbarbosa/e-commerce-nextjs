@@ -1,6 +1,8 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { ProductImageUpload } from "../_components/ProductImageUpload";
 import { adminApi, jsonBody } from "../_components/admin-api";
 import {
   Button,
@@ -17,10 +19,46 @@ type Category = {
   slug: string;
   name: string;
   description: string | null;
+  imageSrc: string | null;
+  imageAlt: string | null;
   parentId: string | null;
   parent?: { name: string } | null;
   _count?: { products: number; children: number };
 };
+
+function CategoryImageField({
+  value,
+  fieldName,
+}: {
+  value?: string | null;
+  fieldName: string;
+}) {
+  const [imageUrl, setImageUrl] = useState(value ?? "");
+
+  return (
+    <div className="space-y-3">
+      <ProductImageUpload
+        uploadPath="/api/admin/uploads/category-images"
+        onUploaded={setImageUrl}
+      />
+      <Field label="Image URL">
+        <input
+          name={fieldName}
+          value={imageUrl}
+          onChange={(event) => setImageUrl(event.target.value)}
+          placeholder="https://..."
+          className={inputClassName}
+        />
+      </Field>
+      {imageUrl ? (
+        <div className="overflow-hidden rounded-2xl border border-stone-200 bg-stone-50">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={imageUrl} alt="" className="h-36 w-full object-cover" />
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export default function AdminCategoriesPage() {
   const queryClient = useQueryClient();
@@ -37,6 +75,25 @@ export default function AdminCategoriesPage() {
           name: String(form.get("name") ?? ""),
           slug: String(form.get("slug") ?? ""),
           description: String(form.get("description") ?? "") || null,
+          imageSrc: String(form.get("imageSrc") ?? "") || null,
+          imageAlt: String(form.get("imageAlt") ?? "") || null,
+          parentId: String(form.get("parentId") ?? "") || null,
+        }),
+      }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["admin", "categories"] }),
+  });
+
+  const updateCategory = useMutation({
+    mutationFn: ({ id, form }: { id: string; form: FormData }) =>
+      adminApi(`/categories/${id}`, {
+        method: "PATCH",
+        body: jsonBody({
+          name: String(form.get("name") ?? ""),
+          slug: String(form.get("slug") ?? ""),
+          description: String(form.get("description") ?? "") || null,
+          imageSrc: String(form.get("imageSrc") ?? "") || null,
+          imageAlt: String(form.get("imageAlt") ?? "") || null,
           parentId: String(form.get("parentId") ?? "") || null,
         }),
       }),
@@ -85,6 +142,14 @@ export default function AdminCategoriesPage() {
               <input name="description" className={inputClassName} />
             </Field>
           </div>
+          <div className="md:col-span-3">
+            <CategoryImageField fieldName="imageSrc" />
+          </div>
+          <div className="md:col-span-2">
+            <Field label="Image alt text">
+              <input name="imageAlt" className={inputClassName} />
+            </Field>
+          </div>
           <div className="md:col-span-5">
             <Button type="submit" disabled={createCategory.isPending}>
               Create category
@@ -93,45 +158,95 @@ export default function AdminCategoriesPage() {
         </form>
       </Card>
 
-      <Card className="overflow-hidden">
-        <table className="min-w-full divide-y divide-stone-200 text-sm">
-          <thead className="bg-stone-50 text-left text-xs uppercase tracking-[0.18em] text-stone-500">
-            <tr>
-              <th className="px-5 py-3">Category</th>
-              <th className="px-5 py-3">Parent</th>
-              <th className="px-5 py-3">Products</th>
-              <th className="px-5 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-stone-100">
-            {(data?.categories ?? []).map((category) => (
-              <tr key={category.id}>
-                <td className="px-5 py-4">
-                  <div className="font-medium text-stone-950">
-                    {category.name}
-                  </div>
-                  <div className="font-mono text-xs text-stone-500">
-                    {category.slug}
-                  </div>
-                </td>
-                <td className="px-5 py-4 text-stone-600">
-                  {category.parent?.name ?? "Root"}
-                </td>
-                <td className="px-5 py-4">
-                  <StatusBadge>{category._count?.products ?? 0}</StatusBadge>
-                </td>
-                <td className="px-5 py-4 text-right">
-                  <SecondaryButton
-                    type="button"
-                    onClick={() => deleteCategory.mutate(category.id)}
-                  >
-                    Delete
-                  </SecondaryButton>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <Card className="p-5">
+        <div className="space-y-4">
+          {(data?.categories ?? []).map((category) => (
+            <form
+              key={category.id}
+              className="grid gap-4 rounded-2xl border border-stone-200 bg-white p-4 md:grid-cols-6"
+              action={(formData) =>
+                updateCategory.mutate({ id: category.id, form: formData })
+              }
+            >
+              <div className="md:col-span-2">
+                <Field label="Name">
+                  <input
+                    name="name"
+                    defaultValue={category.name}
+                    required
+                    className={inputClassName}
+                  />
+                </Field>
+              </div>
+              <div className="md:col-span-2">
+                <Field label="Slug">
+                  <input
+                    name="slug"
+                    defaultValue={category.slug}
+                    required
+                    className={inputClassName}
+                  />
+                </Field>
+              </div>
+              <Field label="Parent">
+                <select
+                  name="parentId"
+                  className={inputClassName}
+                  defaultValue={category.parentId ?? ""}
+                >
+                  <option value="">No parent</option>
+                  {(data?.categories ?? [])
+                    .filter((item) => item.id !== category.id)
+                    .map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+              <div className="flex items-end">
+                <StatusBadge>
+                  {category._count?.products ?? 0} products
+                </StatusBadge>
+              </div>
+              <div className="md:col-span-3">
+                <Field label="Description">
+                  <input
+                    name="description"
+                    defaultValue={category.description ?? ""}
+                    className={inputClassName}
+                  />
+                </Field>
+              </div>
+              <div className="md:col-span-3">
+                <Field label="Image alt text">
+                  <input
+                    name="imageAlt"
+                    defaultValue={category.imageAlt ?? ""}
+                    className={inputClassName}
+                  />
+                </Field>
+              </div>
+              <div className="md:col-span-6">
+                <CategoryImageField
+                  fieldName="imageSrc"
+                  value={category.imageSrc}
+                />
+              </div>
+              <div className="flex gap-2 md:col-span-6">
+                <Button type="submit" disabled={updateCategory.isPending}>
+                  Save category
+                </Button>
+                <SecondaryButton
+                  type="button"
+                  onClick={() => deleteCategory.mutate(category.id)}
+                >
+                  Delete
+                </SecondaryButton>
+              </div>
+            </form>
+          ))}
+        </div>
         {isLoading ? (
           <p className="p-5 text-sm text-stone-500">Loading categories...</p>
         ) : null}
