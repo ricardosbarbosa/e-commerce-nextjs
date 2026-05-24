@@ -10,6 +10,7 @@ import {
   PhotoIcon,
   RectangleStackIcon,
   ShoppingBagIcon,
+  SwatchIcon,
   UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import { useQuery } from "@tanstack/react-query";
@@ -24,6 +25,7 @@ const navigation = [
   { name: "Users", href: "/admin/users", icon: UserGroupIcon },
   { name: "Products", href: "/admin/products", icon: ShoppingBagIcon },
   { name: "Inventory", href: "/admin/inventory", icon: CubeIcon },
+  { name: "Options", href: "/admin/options", icon: SwatchIcon },
   { name: "Categories", href: "/admin/categories", icon: RectangleStackIcon },
   { name: "Orders", href: "/admin/orders", icon: ClipboardDocumentListIcon },
 ];
