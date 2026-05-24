@@ -14,6 +14,7 @@ export const productsModule = new Elysia({
       const { categorySlug, colors, sizes } = body;
 
       const where: Prisma.ProductWhereInput = {
+        status: "ACTIVE",
         categories: {
           some: {
             category: { slug: categorySlug },
@@ -60,8 +61,8 @@ export const productsModule = new Elysia({
   .get(
     "/:slug",
     ({ prisma, params }) => {
-      return prisma.product.findUnique({
-        where: { slug: params.slug },
+      return prisma.product.findFirst({
+        where: { slug: params.slug, status: "ACTIVE" },
         include: {
           images: true,
           variants: {
@@ -115,6 +116,7 @@ export const productsModule = new Elysia({
             some: {
               product: {
                 slug: params.slug,
+                status: "ACTIVE",
               },
             },
           },
@@ -143,6 +145,7 @@ export const productsModule = new Elysia({
             some: {
               product: {
                 slug: params.slug,
+                status: "ACTIVE",
               },
             },
           },
@@ -169,17 +172,17 @@ export const productsModule = new Elysia({
       const { page = "1", limit = "10" } = query;
 
       const totalCount = await prisma.productReview.count({
-        where: { product: { slug: params.slug } },
+        where: { product: { slug: params.slug, status: "ACTIVE" } },
       });
       const averageRating = await prisma.productReview
         .aggregate({
-          where: { product: { slug: params.slug } },
+          where: { product: { slug: params.slug, status: "ACTIVE" } },
           _avg: { rating: true },
         })
         .then((result) => result._avg.rating ?? 0);
 
       const reviews = await prisma.productReview.findMany({
-        where: { product: { slug: params.slug } },
+        where: { product: { slug: params.slug, status: "ACTIVE" } },
         select: {
           id: true,
           authorName: true,

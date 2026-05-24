@@ -114,20 +114,26 @@ export const cartModule = new Elysia({
   .post(
     "/items",
     async ({ prisma, body, user, status }) => {
-      const product = await prisma.product.findFirst({
+      const product = await prisma.product.findUnique({
         where: {
           id: body.productId,
-          status: "ACTIVE",
         },
         select: {
           id: true,
           price: true,
           currency: true,
+          status: true,
         },
       });
 
       if (!product) {
         return status(404, { error: "Product not found." });
+      }
+
+      if (product.status !== "ACTIVE") {
+        return status(409, {
+          error: "This product is not active and cannot be added to cart.",
+        });
       }
 
       const variant = body.variantId

@@ -70,7 +70,7 @@ export default function AdminProductsPage() {
       <PageHeader
         eyebrow="Merchandising board"
         title="Products"
-        description="Create, edit, publish, archive, and remove catalog products and their variants."
+        description="Create, edit, publish, archive, and remove catalog products and their variants. Only ACTIVE products are visible in the storefront and can be added to cart."
         action={
           <Button
             type="button"
@@ -103,8 +103,8 @@ export default function AdminProductsPage() {
             </Field>
             <Field label="Status">
               <select name="status" className={inputClassName}>
-                <option value="DRAFT">Draft</option>
-                <option value="ACTIVE">Active</option>
+                <option value="DRAFT">Draft - hidden from storefront</option>
+                <option value="ACTIVE">Active - sellable</option>
                 <option value="ARCHIVED">Archived</option>
               </select>
             </Field>

@@ -147,7 +147,7 @@ export default function AdminProductDetailPage() {
       <PageHeader
         eyebrow="Product file"
         title={product?.name ?? "Product"}
-        description="Edit merchandising details, publish state, product images, and SKU-level variants."
+        description="Edit merchandising details, publish state, product images, and SKU-level variants. Set status to ACTIVE before selling this item."
       />
 
       {product ? (
@@ -198,8 +198,8 @@ export default function AdminProductDetailPage() {
                 defaultValue={product.status}
                 className={inputClassName}
               >
-                <option value="DRAFT">Draft</option>
-                <option value="ACTIVE">Active</option>
+                <option value="DRAFT">Draft - hidden from storefront</option>
+                <option value="ACTIVE">Active - sellable</option>
                 <option value="ARCHIVED">Archived</option>
               </select>
             </Field>
