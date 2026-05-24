@@ -13,6 +13,12 @@ const completeCheckoutParamsSchema = z.object({
   sessionId: z.string().min(1),
 });
 
+const checkoutPaymentMessage = {
+  cancelled:
+    "Payment was cancelled. You can review your details and try again.",
+  failed: "Payment was not completed. Please try another payment method.",
+} as const;
+
 function formValue(body: unknown, name: string) {
   if (body instanceof FormData || body instanceof URLSearchParams) {
     const value = body.get(name);
@@ -38,6 +44,17 @@ function formValue(body: unknown, name: string) {
 
 function redirectTo(request: Request, path: string) {
   return Response.redirect(new URL(path, request.url), 303);
+}
+
+function redirectToCheckoutWithPaymentMessage(
+  request: Request,
+  payment: keyof typeof checkoutPaymentMessage,
+) {
+  const url = new URL("/checkout", request.url);
+  url.searchParams.set("payment", payment);
+  url.searchParams.set("message", checkoutPaymentMessage[payment]);
+
+  return Response.redirect(url, 303);
 }
 
 function priceToCents(price: unknown) {
@@ -422,6 +439,19 @@ async function completeStripeCheckoutSession(context: CompleteCheckoutContext) {
   return { order };
 }
 
+async function redirectAfterStripeCheckoutSession(
+  context: CompleteCheckoutContext,
+) {
+  const result = await completeStripeCheckoutSession(context);
+  const order = "order" in result ? result.order : null;
+
+  if (order && "status" in order && order.status === "CONFIRMED") {
+    return redirectTo(context.request, `/orders/${order.id}`);
+  }
+
+  return redirectToCheckoutWithPaymentMessage(context.request, "failed");
+}
+
 async function createStripeCheckoutSession(context: AuthenticatedContext) {
   const { request } = context;
 
@@ -563,7 +593,7 @@ async function createStripeCheckoutSession(context: AuthenticatedContext) {
         shippingRateId,
         betterAuthUserId: context.user.id,
       },
-      success_url: `${origin}/checkout?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${origin}/api/checkout/stripe/sessions/{CHECKOUT_SESSION_ID}/complete`,
       cancel_url: `${origin}/checkout?payment=cancelled`,
       invoice_creation: {
         enabled: true,
@@ -617,6 +647,18 @@ export const checkoutModule = new Elysia({ name: "checkout" })
       params: completeCheckoutParamsSchema,
       detail: {
         summary: "Complete a paid Stripe Checkout session",
+        tags: ["Checkout"],
+      },
+    },
+  )
+  .get(
+    "/checkout/stripe/sessions/:sessionId/complete",
+    (context) => redirectAfterStripeCheckoutSession(context),
+    {
+      authenticated: true,
+      params: completeCheckoutParamsSchema,
+      detail: {
+        summary: "Complete a paid Stripe Checkout session and redirect",
         tags: ["Checkout"],
       },
     },
