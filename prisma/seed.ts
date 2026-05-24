@@ -15,9 +15,13 @@ import {
 } from "../src/generated/prisma/enums";
 
 const defaultDatabaseUrl = "postgresql://app:app@127.0.0.1:5433/ecommerce";
+const databaseUrl =
+  process.env.DATABASE_PRISMA_DATABASE_URL ??
+  process.env.DATABASE_URL ??
+  defaultDatabaseUrl;
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL ?? defaultDatabaseUrl,
+  connectionString: databaseUrl,
 });
 
 const userId = "gHNtel8EfqtFxEDzHS7ajOcgbxJ7aRo2";
